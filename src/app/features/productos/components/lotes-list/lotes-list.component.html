@@ -1,0 +1,91 @@
+<div class="max-w-6xl mx-auto space-y-8 pb-12">
+  <!-- Header del Producto -->
+  <div class="bg-primary-900 text-white p-10 rounded-[2.5rem] shadow-premium relative overflow-hidden animate-fade-in">
+    <!-- Decoración visual -->
+    <div class="absolute -right-10 -top-10 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl animate-pulse"></div>
+    
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+      <div class="flex items-center gap-6">
+        <div class="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center border border-white/10 shadow-inner">
+          <span class="w-10 h-10 text-primary-300" [innerHTML]="icons.BOXES | safeHtml"></span>
+        </div>
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <span class="px-2 py-0.5 bg-primary-500 text-primary-950 text-[10px] font-black rounded-md uppercase tracking-widest">Kardex de Inventario</span>
+            <span *ngIf="producto()?.codigoInterno" class="text-primary-400 text-[10px] font-bold uppercase tracking-widest opacity-60">SKU: {{ producto()?.codigoInterno }}</span>
+          </div>
+          <h1 class="text-4xl font-black tracking-tight leading-none mb-2">{{ producto()?.nombreComercial }}</h1>
+          <p class="text-primary-200/70 font-medium uppercase tracking-widest text-[11px]">
+            {{ producto()?.principioActivo || 'Sin principio activo' }} | {{ producto()?.laboratorioNombre || 'Sin Laboratorio' }}
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-end gap-2">
+        <div class="bg-white/5 backdrop-blur-sm px-6 py-4 rounded-3xl border border-white/5 flex flex-col items-end">
+          <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest mb-1">Stock Consolidado</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-black text-white">{{ producto()?.stockTotal || 0 }}</span>
+            <span class="text-sm font-bold text-primary-300 uppercase tracking-widest">Unidades</span>
+          </div>
+        </div>
+        <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK" class="mt-2">Volver al Catálogo</app-button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Listado de Lotes -->
+  <div class="animate-slide-up" style="animation-delay: 100ms">
+    <div class="flex items-center justify-between mb-6 px-4">
+      <div>
+        <h3 class="text-sm font-black text-gray-800 uppercase tracking-[0.2em] flex items-center">
+          <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full"></span>
+          Trazabilidad por Lotes
+        </h3>
+        <p class="text-[10px] text-gray-400 font-bold uppercase mt-1">Desglose físico de la mercancía en almacén</p>
+      </div>
+    </div>
+
+    <app-table
+      [columns]="columns"
+      [data]="lotes()"
+      [loading]="loading()"
+      emptyCtaLabel="Nueva Orden de Compra"
+      emptyCtaIcon="ADD"
+    ></app-table>
+  </div>
+
+  <!-- Informativo de Trazabilidad -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up" style="animation-delay: 200ms">
+    <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl flex items-start gap-4">
+      <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
+        <span class="w-5 h-5" [innerHTML]="icons.CHECK | safeHtml"></span>
+      </div>
+      <div>
+        <h4 class="text-xs font-black text-emerald-800 uppercase tracking-wider mb-1">Control de Calidad</h4>
+        <p class="text-[11px] text-emerald-600 font-medium leading-relaxed uppercase">Cada lote tiene su propio vencimiento para garantizar la seguridad del paciente.</p>
+      </div>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-100 p-6 rounded-3xl flex items-start gap-4">
+      <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+        <span class="w-5 h-5" [innerHTML]="icons.INFO | safeHtml"></span>
+      </div>
+      <div>
+        <h4 class="text-xs font-black text-blue-800 uppercase tracking-wider mb-1">Metodología FEFO</h4>
+        <p class="text-[11px] text-blue-600 font-medium leading-relaxed uppercase">El sistema prioriza automáticamente la venta del lote con vencimiento más cercano.</p>
+      </div>
+    </div>
+
+    <div class="bg-gray-50 border border-gray-100 p-6 rounded-3xl flex items-start gap-4">
+      <div class="w-10 h-10 bg-gray-100 text-gray-400 rounded-xl flex items-center justify-center shrink-0">
+        <span class="w-5 h-5" [innerHTML]="icons.SEARCH | safeHtml"></span>
+      </div>
+      <div>
+        <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider mb-1">Auditoría Total</h4>
+        <p class="text-[11px] text-gray-500 font-medium leading-relaxed uppercase">Puedes rastrear el origen de cada tableta mediante el documento de referencia.</p>
+      </div>
+    </div>
+  </div>
+</div>
+

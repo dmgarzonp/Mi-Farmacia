@@ -1,0 +1,137 @@
+<div class="max-w-[1600px] mx-auto space-y-8 pb-12">
+  <!-- Header con KPI Dashboard -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in">
+    <!-- Título y Acciones -->
+    <div class="md:col-span-4 flex items-center justify-between mb-2">
+      <div>
+        <h1 class="text-2xl font-black text-gray-900 tracking-tight">Catálogo Maestro</h1>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de Productos e Inventario Real</p>
+      </div>
+      <div class="flex gap-3">
+        <app-button variant="secondary" (clicked)="gestionarLaboratorios()" iconNameLeft="VIEW">Laboratorios</app-button>
+        <app-button variant="secondary" (clicked)="gestionarCategorias()" iconNameLeft="CATEGORIES">Categorías</app-button>
+        <app-button variant="primary" (clicked)="crearNuevo()" iconNameLeft="ADD">Nuevo Producto</app-button>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div 
+      (click)="filterType = 'all'; applyFilter()"
+      class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium cursor-pointer transition-all hover:scale-105 group"
+      [class.ring-2]="filterType === 'all'"
+      [class.ring-primary-500]="filterType === 'all'"
+    >
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-primary-100 text-primary-600 rounded-2xl flex items-center justify-center group-hover:bg-primary-500 group-hover:text-white transition-colors">
+          <span class="w-6 h-6" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-gray-800">{{ stats().total }}</span>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Catálogo</p>
+        </div>
+      </div>
+    </div>
+
+    <div 
+      (click)="filterType = 'stock-bajo'; applyFilter()"
+      class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium cursor-pointer transition-all hover:scale-105 group"
+      [class.ring-2]="filterType === 'stock-bajo'"
+      [class.ring-amber-500]="filterType === 'stock-bajo'"
+    >
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-colors">
+          <span class="w-6 h-6" [innerHTML]="icons.ALERT | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-gray-800">{{ stats().stockBajo }}</span>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Bajo</p>
+        </div>
+      </div>
+    </div>
+
+    <div 
+      (click)="filterType = 'sin-stock'; applyFilter()"
+      class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium cursor-pointer transition-all hover:scale-105 group"
+      [class.ring-2]="filterType === 'sin-stock'"
+      [class.ring-red-500]="filterType === 'sin-stock'"
+    >
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
+          <span class="w-6 h-6" [innerHTML]="icons.ERROR | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-gray-800">{{ stats().sinStock }}</span>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agotados</p>
+        </div>
+      </div>
+    </div>
+
+    <div 
+      class="bg-primary-900 text-white p-6 rounded-3xl shadow-premium relative overflow-hidden group transition-all hover:scale-105 cursor-pointer"
+    >
+      <div class="absolute -right-4 -top-4 w-20 h-20 bg-primary-500/10 rounded-full blur-2xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 bg-white/10 text-primary-300 rounded-2xl flex items-center justify-center">
+          <span class="w-6 h-6" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-white">{{ stats().vencimientosProximos }}</span>
+          <p class="text-[10px] font-bold text-primary-400 uppercase tracking-widest">Próximos Vencimientos</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Búsqueda y Filtros -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium flex flex-wrap gap-4 items-center animate-slide-up">
+    <div class="flex-1 min-w-[300px] relative group">
+      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+        <span class="w-5 h-5 block" [innerHTML]="icons.SEARCH | safeHtml"></span>
+      </span>
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        (input)="onSearch()"
+        placeholder="Buscar por nombre comercial, principio activo, SKU o código de barras..."
+        class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium"
+      />
+    </div>
+
+    <div class="w-64 relative">
+      <select 
+        [(ngModel)]="selectedCategoria" 
+        (change)="onCategoriaChange()"
+        class="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium appearance-none cursor-pointer"
+      >
+        <option value="">Todas las categorías</option>
+        <option *ngFor="let cat of categoriasService.categorias()" [value]="cat.id">{{ cat.nombre }}</option>
+      </select>
+      <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </div>
+    </div>
+
+    <app-button
+      *ngIf="searchTerm || selectedCategoria || filterType !== 'all'"
+      variant="secondary"
+      size="sm"
+      (clicked)="searchTerm = ''; selectedCategoria = ''; filterType = 'all'; applyFilter()"
+      iconNameLeft="CANCEL"
+    >
+      Limpiar Filtros
+    </app-button>
+  </div>
+
+  <!-- Tabla de Resultados -->
+  <div class="animate-slide-up" style="animation-delay: 100ms">
+    <app-table
+      [columns]="columns"
+      [data]="filteredProductos()"
+      [actions]="actions"
+      [loading]="productosService.loading()"
+      emptyCtaLabel="Registrar Primer Producto"
+      emptyCtaIcon="ADD"
+      (emptyCtaClicked)="crearNuevo()"
+    ></app-table>
+  </div>
+</div>

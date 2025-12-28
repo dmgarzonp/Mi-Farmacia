@@ -1,0 +1,237 @@
+<div class="max-w-6xl mx-auto space-y-6 pb-12">
+  <!-- Header con Estética Premium -->
+  <div class="flex items-center justify-between animate-fade-in">
+    <div>
+      <h1 class="text-2xl font-black text-gray-900 tracking-tight">{{ isEditMode ? 'Editar' : 'Nueva' }} Orden de Compra</h1>
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Suministro de Mercancía a Almacén</p>
+    </div>
+    <app-button
+      variant="secondary"
+      (clicked)="volver()"
+      iconNameLeft="BACK"
+    >
+      Volver
+    </app-button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-slide-up">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Columna Izquierda: Datos Generales -->
+      <div class="lg:col-span-1 space-y-6">
+        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
+          <h3 class="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center">
+            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full"></span>
+            Datos Generales
+          </h3>
+          
+          <div class="space-y-6">
+            <app-autocomplete
+              label="Proveedor"
+              [items]="proveedoresItems"
+              formControlName="proveedorId"
+              placeholder="Buscar proveedor..."
+              [required]="true"
+              iconName="USERS"
+              [hasError]="!!(form.get('proveedorId')?.invalid && form.get('proveedorId')?.touched)"
+            ></app-autocomplete>
+
+            <app-date-picker
+              label="Fecha de Emisión"
+              formControlName="fechaEmision"
+              [required]="true"
+            ></app-date-picker>
+
+            <app-input
+              label="Observaciones"
+              formControlName="observaciones"
+              placeholder="Notas sobre el envío o proveedor..."
+              iconName="CLIPBOARD"
+            ></app-input>
+
+            <div *ngIf="isEditMode">
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Estado</label>
+              <div class="relative group">
+                <select formControlName="estado" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none">
+                  <option [value]="EstadoOrdenCompra.PENDIENTE">Pendiente</option>
+                  <option [value]="EstadoOrdenCompra.APROBADA">Aprobada</option>
+                  <option [value]="EstadoOrdenCompra.RECIBIDA">Recibida</option>
+                  <option [value]="EstadoOrdenCompra.CANCELADA">Cancelada</option>
+                </select>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen de Totales Premium -->
+        <div class="bg-primary-900 text-white p-8 rounded-3xl shadow-premium relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-500/10 rounded-full blur-2xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
+          
+          <h3 class="text-xs font-black text-primary-400 uppercase tracking-[0.2em] mb-6 flex items-center">
+            <span class="w-4 h-4 mr-2" [innerHTML]="icons.CHART | safeHtml"></span>
+            Resumen de Orden
+          </h3>
+          
+          <div class="space-y-4">
+            <div class="flex justify-between items-center text-primary-100/70 text-sm">
+              <span class="font-medium">Total de Productos:</span>
+              <span class="text-lg font-black text-white">{{ detalles.length }}</span>
+            </div>
+            
+            <div class="pt-6 border-t border-white/10">
+              <div class="flex flex-col gap-1">
+                <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest">Importe Total (PEN)</span>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-xl font-medium text-primary-300">S/</span>
+                  <span class="text-4xl font-black text-white tracking-tight">{{ totalOrden.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-8">
+            <app-button
+              type="submit"
+              variant="primary"
+              [fullWidth]="true"
+              [disabled]="form.invalid || guardando || detalles.length === 0"
+              iconNameLeft="SAVE"
+              [loading]="guardando"
+            >
+              {{ isEditMode ? 'Actualizar Orden' : 'Confirmar Orden' }}
+            </app-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Detalle de Productos -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium rounded-3xl overflow-hidden">
+          <div class="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-gray-50/50">
+            <div>
+              <h3 class="text-sm font-black text-gray-800 uppercase tracking-[0.15em] flex items-center">
+                <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full"></span>
+                Detalle de Productos
+              </h3>
+              <p class="text-[11px] text-gray-400 font-medium mt-1 uppercase tracking-wider">Define el lote y vencimiento de cada item</p>
+            </div>
+            <app-button
+              type="button"
+              variant="secondary"
+              size="sm"
+              (clicked)="agregarDetalle()"
+              iconNameLeft="ADD"
+            >
+              Nuevo Item
+            </app-button>
+          </div>
+
+          <div class="p-8">
+            <div formArrayName="detalles" class="space-y-4">
+              <div *ngFor="let det of detalles.controls; let i = index" [formGroupName]="i" 
+                   class="grid grid-cols-12 gap-4 p-5 bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-primary-200 hover:shadow-md rounded-2xl transition-all group">
+                
+                <!-- Buscador de Producto -->
+                <div class="col-span-12 md:col-span-5">
+                  <app-autocomplete
+                    [items]="productosItems"
+                    formControlName="productoId"
+                    placeholder="Buscar producto..."
+                    [required]="true"
+                    (itemSelected)="onProductoSelected($event, i)"
+                    [hasError]="!!(det.get('productoId')?.invalid && det.get('productoId')?.touched)"
+                  ></app-autocomplete>
+                </div>
+
+                <!-- Cantidad -->
+                <div class="col-span-4 md:col-span-2">
+                  <app-input
+                    type="number"
+                    formControlName="cantidad"
+                    placeholder="0"
+                    label="Cant."
+                    (input)="calcularSubtotal(i)"
+                  ></app-input>
+                </div>
+
+                <!-- Precio Unitario -->
+                <div class="col-span-4 md:col-span-2">
+                  <app-input
+                    type="number"
+                    formControlName="precioUnitario"
+                    placeholder="0.00"
+                    label="P. Unit"
+                    (input)="calcularSubtotal(i)"
+                  ></app-input>
+                </div>
+
+                <!-- Subtotal -->
+                <div class="col-span-4 md:col-span-2 flex flex-col justify-center">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Subtotal</span>
+                  <div class="px-4 py-2.5 bg-primary-50 rounded-xl border border-primary-100">
+                    <span class="text-sm font-black text-primary-700">S/ {{ det.get('subtotal')?.value?.toFixed(2) || '0.00' }}</span>
+                  </div>
+                </div>
+
+                <!-- Segunda Fila: Lote y Vencimiento -->
+                <div class="col-span-12 md:col-span-11 grid grid-cols-2 gap-4">
+                  <app-input
+                    type="text"
+                    formControlName="lote"
+                    placeholder="Ej: LOTE-123"
+                    label="Nº Lote"
+                  ></app-input>
+                  
+                  <app-date-picker
+                    formControlName="fechaVencimiento"
+                    label="Vencimiento"
+                    [required]="true"
+                  ></app-date-picker>
+                </div>
+
+                <!-- Botón Eliminar -->
+                <div class="col-span-12 md:col-span-1 flex items-end justify-end pb-1">
+                  <button 
+                    type="button" 
+                    (click)="removerDetalle(i)"
+                    class="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group/del"
+                    title="Quitar de la lista"
+                  >
+                    <span class="w-5 h-5 block group-hover/del:scale-110 transition-transform" [innerHTML]="icons.DELETE | safeHtml"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Estado Vacío -->
+              <div *ngIf="detalles.length === 0" 
+                   class="py-16 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
+                <div class="flex flex-col items-center gap-4">
+                  <div class="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-gray-200">
+                    <span class="w-8 h-8" [innerHTML]="icons.BOXES | safeHtml"></span>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-gray-600">No hay productos</h4>
+                    <p class="text-xs text-gray-400 mt-1">Haz clic en "Nuevo Item" para comenzar</p>
+                  </div>
+                  <app-button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    (clicked)="agregarDetalle()"
+                    iconNameLeft="ADD"
+                  >
+                    Agregar Primer Producto
+                  </app-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>

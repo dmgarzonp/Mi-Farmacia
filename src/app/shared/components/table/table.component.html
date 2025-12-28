@@ -1,0 +1,162 @@
+<div class="w-full animate-fade-in">
+  <!-- Search Bar Moderno -->
+  <div *ngIf="searchable" class="mb-6">
+    <div class="relative max-w-md group">
+      <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400 group-focus-within:text-primary-500 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </span>
+      <input
+        type="text"
+        placeholder="Buscar en la tabla..."
+        [(ngModel)]="searchTerm"
+        (input)="onSearch()"
+        class="w-full pl-12 pr-4 py-3 bg-white/50 backdrop-blur-sm border border-white/20 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm shadow-premium"
+      />
+    </div>
+  </div>
+
+  <!-- Table Modern Emerald -->
+  <div class="overflow-hidden bg-white/70 backdrop-blur-md rounded-[2.5rem] border border-white/20 shadow-premium hover:shadow-premium-hover transition-all duration-500">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+          <tr class="bg-gray-50/50">
+            <th
+              *ngFor="let column of columns"
+              [style.width]="column.width"
+              class="px-6 py-5 text-left text-xs font-bold text-gray-500 tracking-wider cursor-pointer hover:text-primary-600 transition-colors"
+              (click)="column.sortable !== false && onSort(column.key)"
+            >
+              <div class="flex items-center gap-2">
+                <span>{{ column.label }}</span>
+                <span *ngIf="column.sortable !== false" class="transition-transform duration-300">
+                  <svg *ngIf="sortKey() !== column.key" class="w-3 h-3 opacity-30" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"></path>
+                  </svg>
+                  <svg *ngIf="sortKey() === column.key && sortDirection() === 'asc'" class="w-4 h-4 text-primary-600 animate-bounce-subtle" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 14l5-5 5 5H7z"></path>
+                  </svg>
+                  <svg *ngIf="sortKey() === column.key && sortDirection() === 'desc'" class="w-4 h-4 text-primary-600 animate-bounce-subtle" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 10l5 5 5-5H7z"></path>
+                  </svg>
+                </span>
+              </div>
+            </th>
+            <th *ngIf="actions && actions.length > 0" class="px-6 py-5 text-right text-xs font-bold text-gray-500 tracking-wider">
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <!-- Loading State (Skeleton) -->
+          <ng-container *ngIf="loading">
+            <tr *ngFor="let i of [].constructor(skeletonRows)" class="animate-pulse">
+              <td *ngFor="let col of columns" class="px-6 py-5">
+                <app-skeleton width="80%" height="1.25rem"></app-skeleton>
+              </td>
+              <td *ngIf="actions && actions.length > 0" class="px-6 py-5 text-right">
+                <div class="flex gap-2 justify-end">
+                  <app-skeleton width="2rem" height="2rem" variant="rect" className="rounded-xl"></app-skeleton>
+                  <app-skeleton width="2rem" height="2rem" variant="rect" className="rounded-xl"></app-skeleton>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- Data Rows -->
+          <ng-container *ngIf="!loading">
+            <tr
+              *ngFor="let row of paginatedData(); let i = index"
+              class="hover:bg-primary-50/30 transition-all duration-200 cursor-pointer group"
+              (click)="onRowClick(row)"
+            >
+            <td
+              *ngFor="let column of columns"
+              class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium"
+            >
+              <div [innerHTML]="(column.render ? column.render(row) : getRowValue(row, column.key)) | safeHtml"></div>
+            </td>
+            <td *ngIf="actions && actions.length > 0" class="px-6 py-4 whitespace-nowrap text-right">
+              <div class="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
+                <button
+                  *ngFor="let action of actions"
+                  [hidden]="action.visible && !action.visible(row)"
+                  (click)="handleAction($event, action, row)"
+                  class="p-2 rounded-xl transition-all duration-300 group/btn shadow-sm flex items-center justify-center"
+                  [ngClass]="{
+                    'bg-primary-600 text-white hover:bg-primary-700 hover:shadow-md': action.variant === 'primary' || !action.variant,
+                    'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50': action.variant === 'secondary',
+                    'bg-red-500 text-white hover:bg-red-600 hover:shadow-md': action.variant === 'danger',
+                    'bg-emerald-500 text-white hover:bg-emerald-600 hover:shadow-md': action.variant === 'success',
+                    'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-md': action.variant === 'warning'
+                  }"
+                  [title]="action.label"
+                >
+                  <ng-container *ngIf="getActionIcon(action) as icon">
+                    <span class="w-4 h-4 group-hover/btn:scale-110 inline-block transition-transform" [innerHTML]="icon | safeHtml"></span>
+                  </ng-container>
+                  <span *ngIf="!getActionIcon(action)" class="text-xs font-bold tracking-tight px-1">{{ action.label }}</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="paginatedData().length === 0">
+            <td [colSpan]="columns.length + (actions?.length ? 1 : 0)" class="px-6 py-24 text-center">
+              <div class="flex flex-col items-center max-w-sm mx-auto animate-fade-in">
+                <div class="w-24 h-24 bg-white/50 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-premium border border-white/40">
+                  <svg class="w-12 h-12 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                  </svg>
+                </div>
+                <h3 class="text-gray-400 font-black text-xl leading-tight mb-2">{{ emptyMessage }}</h3>
+                <p class="text-gray-300 text-sm mb-8">Parece que aún no hay registros aquí. ¡Comencemos agregando uno!</p>
+                
+                <app-button 
+                  *ngIf="emptyCtaLabel"
+                  variant="primary" 
+                  [iconNameLeft]="emptyCtaIcon || 'ADD'"
+                  (clicked)="emptyCtaClicked.emit()"
+                >
+                  {{ emptyCtaLabel }}
+                </app-button>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination Moderno -->
+  <div *ngIf="paginated && filteredData().length > pageSize" class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+    <div class="text-xs text-gray-400 font-bold tracking-wider">
+      Mostrando {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, filteredData().length) }} de {{ filteredData().length }} resultados
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        (click)="previousPage()"
+        [disabled]="currentPage() === 1"
+        class="p-2.5 rounded-xl border border-white/20 bg-white/50 backdrop-blur-sm text-gray-500 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-sm"
+      >
+        <span class="w-5 h-5 block" [innerHTML]="icons.CHEVRON_LEFT | safeHtml"></span>
+      </button>
+      
+      <div class="flex gap-1">
+        <span class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-600 text-white font-black shadow-premium text-sm">
+          {{ currentPage() }}
+        </span>
+      </div>
+
+      <button
+        (click)="nextPage()"
+        [disabled]="currentPage() >= totalPages()"
+        class="p-2.5 rounded-xl border border-white/20 bg-white/50 backdrop-blur-sm text-gray-500 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-sm"
+      >
+        <span class="w-5 h-5 block" [innerHTML]="icons.CHEVRON_RIGHT | safeHtml"></span>
+      </button>
+    </div>
+  </div>
+</div>

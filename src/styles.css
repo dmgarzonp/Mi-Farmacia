@@ -1,1 +1,126 @@
-/* You can add global styles to this file, and also import other style files */
+/* Google Fonts - Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Colores de fondo */
+  --background: #f8faf9;
+  --foreground: #1f2937;
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+
+  /* Colores primarios (Verde Esmeralda) */
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --primary-hover: #059669;
+  --primary-light: #34d399;
+
+  /* Colores secundarios (Grises) */
+  --secondary: #6b7280;
+  --secondary-foreground: #ffffff;
+  --secondary-dark: #4b5563;
+  --secondary-light: #9ca3af;
+
+  /* Colores de acento */
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+
+  /* Colores de UI */
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --input-background: #ffffff;
+
+  /* Sidebar */
+  --sidebar-bg: #065f46;
+  --sidebar-hover: #059669;
+  --sidebar-active: #10b981;
+  --sidebar-border: #064e3b;
+  --sidebar-text: #ffffff;
+
+  /* Estados */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #dc2626;
+  --info: #3b82f6;
+
+  /* Efectos */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --radius: 0.75rem;
+}
+
+/* Global Styles */
+@layer base {
+    * {
+        @apply border-gray-200;
+    }
+
+    body {
+        background-color: var(--background);
+        background-image: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.03) 0px, transparent 50%),
+                          radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.03) 0px, transparent 50%);
+        color: var(--foreground);
+        @apply font-sans antialiased min-h-screen;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        @apply font-bold text-gray-900 tracking-tight;
+    }
+
+    h1 { @apply text-3xl; }
+    h2 { @apply text-2xl; }
+    h3 { @apply text-xl; }
+}
+
+/* Custom Utilities */
+@layer utilities {
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: rgb(209 250 229) transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background-color: #a7f3d0;
+        border-radius: 3px;
+    }
+}
+
+/* Custom Components */
+@layer components {
+    .card {
+        @apply bg-white rounded-3xl shadow-premium p-6 border border-white/20 transition-all duration-500 hover:shadow-premium-hover;
+    }
+
+    .btn {
+        @apply px-4 py-2 rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    }
+
+    .input {
+        @apply w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm;
+    }
+
+    /* Window Controls Utility */
+    .drag-region {
+        -webkit-app-region: drag;
+    }
+
+    .no-drag-region {
+        -webkit-app-region: no-drag;
+    }
+}

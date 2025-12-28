@@ -1,0 +1,22 @@
+<div class="fixed top-4 right-4 z-50 space-y-2">
+  <div
+    *ngFor="let alert of alertService.alerts()"
+    [class]="getAlertClasses(alert.type)"
+    class="animate-fade-in"
+  >
+    <div class="flex items-start gap-3">
+      <span class="w-5 h-5 flex-shrink-0 mt-0.5" [innerHTML]="getIcon(alert.type) | safeHtml"></span>
+      <p class="flex-1 text-sm font-medium">{{ alert.message }}</p>
+      <button
+        (click)="alertService.remove(alert.id)"
+        class="text-current opacity-70 hover:opacity-100 transition-opacity"
+        aria-label="Cerrar notificación"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,32 @@
+<button
+  [type]="type"
+  [disabled]="disabled || loading"
+  [class]="buttonClasses"
+  (click)="handleClick($event)"
+  class="relative active:scale-95 transition-transform"
+>
+  <!-- Loading Spinner Overlay-like -->
+  <span *ngIf="loading" class="flex items-center justify-center">
+    <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <span class="opacity-90">Cargando...</span>
+  </span>
+
+  <!-- Normal State -->
+  <ng-container *ngIf="!loading">
+    <span *ngIf="leftIconHtml" class="inline-flex items-center justify-center" [ngClass]="iconSizeClass">
+      <span class="w-full h-full block" [innerHTML]="leftIconHtml | safeHtml"></span>
+    </span>
+    
+    <span class="inline-block">
+      <ng-content></ng-content>
+    </span>
+
+    <span *ngIf="rightIconHtml" class="inline-flex items-center justify-center" [ngClass]="iconSizeClass">
+      <span class="w-full h-full block" [innerHTML]="rightIconHtml | safeHtml"></span>
+    </span>
+  </ng-container>
+</button>
+

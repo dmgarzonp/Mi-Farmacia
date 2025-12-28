@@ -41,3 +41,9 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

@@ -1,0 +1,125 @@
+<aside
+  [class]="sidebarClasses"
+  role="navigation"
+  aria-label="Navegación principal"
+>
+  <!-- Header Moderno Esmeralda -->
+  <div class="p-6 bg-primary-800">
+    <div class="flex items-center justify-between">
+      <div [class]="isCollapsed() ? 'hidden' : 'flex items-center gap-3'">
+        <div class="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary-900/20">
+          MF
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold text-white leading-tight tracking-tight">Mi Farmacia</h1>
+          <p class="text-[10px] text-primary-200 tracking-widest font-bold">Salud & Bienestar</p>
+        </div>
+      </div>
+      <button
+        (click)="toggleSidebar()"
+        class="p-2 rounded-lg hover:bg-primary-700 text-primary-100 transition-all duration-300"
+        [attr.aria-label]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'"
+      >
+        <span class="w-5 h-5 block" [innerHTML]="(isCollapsed() ? icons.CHEVRON_DOUBLE_RIGHT : icons.CHEVRON_DOUBLE_LEFT) | safeHtml"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-8 bg-primary-800">
+    <div>
+      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
+        Menú Principal
+      </div>
+      <ul class="space-y-1.5">
+        <li>
+          <a
+            routerLink="/dashboard"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [routerLinkActiveOptions]="{exact: true}"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Dashboard' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.DASHBOARD | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Dashboard</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Sección Ventas -->
+    <div>
+      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
+        Operaciones
+      </div>
+      <ul class="space-y-1.5">
+        <li>
+          <a
+            routerLink="/ventas"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Ventas' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.CART | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Ventas</span>
+          </a>
+        </li>
+        <li>
+          <a
+            routerLink="/compras"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Compras' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.BOXES | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Compras</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Sección Inventario -->
+    <div>
+      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
+        Gestión de Datos
+      </div>
+      <ul class="space-y-1.5">
+        <li>
+          <a
+            routerLink="/productos"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Productos' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Productos</span>
+          </a>
+        </li>
+        <li>
+          <a
+            routerLink="/proveedores"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Proveedores' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.TRUCK | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Proveedores</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Footer con Usuario Moderno -->
+  <div class="p-6 bg-primary-900/50 border-t border-primary-700/30">
+    <div [class]="isCollapsed() ? 'flex justify-center' : 'flex items-center gap-3'">
+      <div class="w-10 h-10 bg-primary-400 text-primary-900 rounded-full flex items-center justify-center font-bold border-2 border-primary-300 shadow-inner">
+        D
+      </div>
+      <div [class]="isCollapsed() ? 'hidden' : 'block'">
+        <p class="text-xs font-bold text-white">dmgarzonp</p>
+        <p class="text-[10px] text-primary-300 font-medium">Administrador</p>
+      </div>
+    </div>
+  </div>
+</aside>

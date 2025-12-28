@@ -1,0 +1,42 @@
+<div
+  *ngIf="isOpen"
+  class="fixed inset-0 z-50 overflow-y-auto"
+  (click)="onBackdropClick()"
+>
+  <!-- Backdrop Blur Moderno -->
+  <div class="fixed inset-0 bg-gray-900/60 transition-opacity backdrop-blur-md"></div>
+  
+  <!-- Modal Container -->
+  <div class="flex min-h-full items-center justify-center p-4">
+    <div
+      [class]="modalClasses"
+      class="animate-slide-up bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl overflow-hidden"
+      (click)="$event.stopPropagation()"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="title ? 'modal-title' : null"
+    >
+      <!-- Header Estilo Moderno -->
+      <div *ngIf="title || showCloseButton" class="flex items-center justify-between px-8 py-5 border-b border-gray-100/50 bg-white/30">
+        <h3 *ngIf="title" id="modal-title" class="text-xl font-black text-gray-900 tracking-tight">
+          {{ title }}
+        </h3>
+        <button
+          *ngIf="showCloseButton"
+          (click)="close()"
+          class="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all p-2 rounded-full"
+          aria-label="Cerrar modal"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Body -->
+      <div class="px-8 py-6 bg-white/40">
+        <ng-content></ng-content>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,85 @@
+<div class="max-w-[1600px] mx-auto space-y-8 pb-12">
+  <!-- Header con KPI -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in">
+    <div class="md:col-span-4 flex items-center justify-between mb-2">
+      <div>
+        <h1 class="text-2xl font-black text-gray-900 tracking-tight">Órdenes de Compra</h1>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Suministro y Abastecimiento de Medicamentos</p>
+      </div>
+      <app-button variant="primary" (clicked)="crearNueva()" iconNameLeft="ADD">Nueva Orden</app-button>
+    </div>
+
+    <!-- KPI Cards para Órdenes -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+          <span class="w-6 h-6" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-gray-800">
+            {{ (comprasService.ordenes() | filter:'estado':EstadoOrdenCompra.PENDIENTE).length }}
+          </span>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pendientes</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+          <span class="w-6 h-6" [innerHTML]="icons.CHECK | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-2xl font-black text-gray-800">
+            {{ (comprasService.ordenes() | filter:'estado':EstadoOrdenCompra.RECIBIDA).length }}
+          </span>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recibidas</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-primary-900 text-white p-6 rounded-3xl shadow-premium md:col-span-2">
+      <div class="flex items-center gap-6">
+        <div class="w-12 h-12 bg-white/10 text-primary-300 rounded-2xl flex items-center justify-center">
+          <span class="w-6 h-6" [innerHTML]="icons.CART | safeHtml"></span>
+        </div>
+        <div>
+          <span class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em]">Inversión Total Estimada</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-xs font-bold text-primary-300">PEN</span>
+            <span class="text-2xl font-black text-white">S/ 0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Búsqueda -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium animate-slide-up">
+    <div class="relative group">
+      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+        <span class="w-5 h-5 block" [innerHTML]="icons.SEARCH | safeHtml"></span>
+      </span>
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="onSearchChange($event)"
+        placeholder="Buscar por número de orden, proveedor o factura..."
+        class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium"
+      />
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="animate-slide-up" style="animation-delay: 100ms">
+    <app-table
+      [columns]="columns"
+      [data]="comprasService.ordenes() | filter:searchTerm"
+      [actions]="actions"
+      [loading]="comprasService.loading()"
+      emptyCtaLabel="Crear Nueva Orden"
+      emptyCtaIcon="ADD"
+      (emptyCtaClicked)="crearNueva()"
+    ></app-table>
+  </div>
+</div>

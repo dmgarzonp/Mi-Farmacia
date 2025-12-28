@@ -1,0 +1,200 @@
+<div class="max-w-5xl mx-auto space-y-6 pb-12">
+  <!-- Header con Estética Premium -->
+  <div class="flex items-center justify-between animate-fade-in">
+    <div>
+      <h1 class="text-2xl font-black text-gray-900 tracking-tight">{{ isEditMode ? 'Editar' : 'Nuevo' }} Producto</h1>
+      <p class="text-sm text-gray-500 font-medium uppercase tracking-wider mt-1">Gestión del Catálogo Maestro</p>
+    </div>
+    <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Volver</app-button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-slide-up">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Columna Principal: Identificación y Clasificación -->
+      <div class="lg:col-span-2 space-y-8">
+        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
+          <h3 class="text-xs font-black text-primary-600 uppercase tracking-[0.2em] mb-8 flex items-center">
+            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full shadow-sm"></span>
+            Identificación del Producto
+          </h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="md:col-span-2">
+              <app-input
+                label="Nombre Comercial"
+                formControlName="nombreComercial"
+                placeholder="Ej: Panadol Antigripal"
+                [required]="true"
+                [hasError]="!!(form.get('nombreComercial')?.invalid && form.get('nombreComercial')?.touched)"
+                errorMessage="El nombre es obligatorio"
+              ></app-input>
+            </div>
+
+            <app-input
+              label="Principio Activo"
+              formControlName="principioActivo"
+              placeholder="Ej: Paracetamol / Pseudoefedrina"
+            ></app-input>
+
+            <app-input
+              label="Presentación"
+              formControlName="presentacion"
+              placeholder="Ej: Caja x 20 tabletas"
+            ></app-input>
+
+            <app-input
+              label="Código de Barras"
+              formControlName="codigoBarras"
+              placeholder="EAN-13"
+              iconName="SEARCH"
+            ></app-input>
+
+            <app-input
+              label="Código Interno (SKU)"
+              formControlName="codigoInterno"
+              placeholder="Ej: MED-001"
+            ></app-input>
+
+            <!-- Selector de Laboratorio -->
+            <div>
+              <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1">Laboratorio (Fabricante)</label>
+              <div class="relative group">
+                <select formControlName="laboratorioId" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none cursor-pointer">
+                  <option value="">Seleccionar Laboratorio...</option>
+                  <option *ngFor="let lab of laboratoriosService.laboratorios()" [value]="lab.id">{{ lab.nombre }}</option>
+                </select>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selector de Categoría -->
+            <div>
+              <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1">Categoría</label>
+              <div class="relative group">
+                <select formControlName="categoriaId" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none cursor-pointer">
+                  <option value="">Seleccionar Categoría...</option>
+                  <option *ngFor="let cat of categoriasService.categorias()" [value]="cat.id">{{ cat.nombre }}</option>
+                </select>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Regulaciones y Alertas -->
+        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
+          <h3 class="text-xs font-black text-primary-600 uppercase tracking-[0.2em] mb-8 flex items-center">
+            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full shadow-sm"></span>
+            Regulaciones y Alertas
+          </h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="space-y-4 p-4 bg-primary-50/50 rounded-2xl border border-primary-100/50">
+              <label class="flex items-center gap-3 cursor-pointer group">
+                <div class="relative">
+                  <input type="checkbox" formControlName="requiereReceta" class="sr-only peer" />
+                  <div class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-primary-500 transition-colors"></div>
+                  <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
+                </div>
+                <span class="text-sm font-bold text-gray-700 uppercase tracking-tight">Requiere Receta Médica</span>
+              </label>
+              <p class="text-[10px] text-gray-400 ml-13 italic uppercase">El sistema solicitará datos de la receta en la venta</p>
+            </div>
+
+            <div class="space-y-4 p-4 bg-red-50/50 rounded-2xl border border-red-100/50">
+              <label class="flex items-center gap-3 cursor-pointer group">
+                <div class="relative">
+                  <input type="checkbox" formControlName="esControlado" class="sr-only peer" />
+                  <div class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-red-500 transition-colors"></div>
+                  <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
+                </div>
+                <span class="text-sm font-bold text-gray-700 uppercase tracking-tight">Producto Controlado</span>
+              </label>
+              <p class="text-[10px] text-gray-400 ml-13 italic uppercase">Sujeto a fiscalización especial de stock</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Lateral: Precios y Stock -->
+      <div class="lg:col-span-1 space-y-8">
+        <div class="bg-primary-900 text-white p-8 rounded-3xl shadow-premium relative overflow-hidden group">
+          <!-- Decoración -->
+          <div class="absolute -right-6 -top-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-1000"></div>
+
+          <h3 class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em] mb-6 flex items-center relative z-10">
+            Definición de Precios
+          </h3>
+
+          <div class="space-y-6 relative z-10">
+            <div>
+              <label class="block text-[10px] font-black text-primary-300 uppercase tracking-widest mb-2">Precio de Venta Sugerido (USD)</label>
+              <div class="flex items-center gap-3 bg-white/10 rounded-2xl p-1 border border-white/10">
+                <span class="pl-4 text-xl font-medium text-primary-300">$</span>
+                <input 
+                  type="number" 
+                  formControlName="precioVenta"
+                  class="bg-transparent border-none focus:ring-0 text-3xl font-black text-white w-full placeholder:text-white/20"
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <app-input
+              label="Stock Mínimo (Alerta)"
+              type="number"
+              formControlName="stockMinimo"
+              placeholder="0"
+              class="dark-input"
+            ></app-input>
+
+            <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
+              <p class="text-[10px] text-primary-300 font-medium uppercase tracking-wider leading-relaxed">
+                * El stock actual no se edita aquí. Se actualiza automáticamente al recibir lotes de compra o ajustes.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <app-button 
+            type="submit" 
+            variant="primary" 
+            [fullWidth]="true"
+            [disabled]="form.invalid || guardando"
+            iconNameLeft="SAVE"
+            size="lg"
+          >
+            {{ guardando ? 'Guardando...' : (isEditMode ? 'Actualizar Catálogo' : 'Guardar en Catálogo') }}
+          </app-button>
+          
+          <app-button 
+            type="button" 
+            variant="secondary" 
+            [fullWidth]="true" 
+            (clicked)="volver()"
+            iconNameLeft="CANCEL"
+          >
+            Cancelar
+          </app-button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<style>
+  .ml-13 { margin-left: 3.25rem; }
+  ::ng-deep .dark-input label { color: #a7f3d0 !important; }
+  ::ng-deep .dark-input input { 
+    background-color: rgba(255,255,255,0.05) !important; 
+    border-color: rgba(255,255,255,0.1) !important;
+    color: white !important;
+  }
+</style>
