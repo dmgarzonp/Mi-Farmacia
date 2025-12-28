@@ -1,53 +1,62 @@
 <div class="max-w-[1600px] mx-auto space-y-8 pb-12">
-  <!-- Header con KPI -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in">
-    <div class="md:col-span-4 flex items-center justify-between mb-2">
-      <div>
-        <h1 class="text-2xl font-black text-gray-900 tracking-tight">Órdenes de Compra</h1>
-        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Suministro y Abastecimiento de Medicamentos</p>
-      </div>
-      <app-button variant="primary" (clicked)="crearNueva()" iconNameLeft="ADD">Nueva Orden</app-button>
+  <!-- Cabecera Premium -->
+  <div class="flex items-center justify-between animate-fade-in">
+    <div>
+      <h1 class="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+        Abastecimiento
+        <span class="px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs font-bold border border-primary-100">
+          {{ stats().total }} Órdenes
+        </span>
+      </h1>
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de Órdenes de Compra y Recepción de Mercancía</p>
     </div>
+    <app-button variant="primary" (clicked)="crearNueva()" iconNameLeft="ADD" class="shadow-lg shadow-primary-500/20">
+      Nueva Orden de Compra
+    </app-button>
+  </div>
 
-    <!-- KPI Cards para Órdenes -->
-    <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium">
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-          <span class="w-6 h-6" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
+    <!-- Card 1: Pendientes -->
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+          <span class="w-6 h-6 block" [innerHTML]="icons.CALENDAR | safeHtml"></span>
         </div>
         <div>
-          <span class="text-2xl font-black text-gray-800">
-            {{ (comprasService.ordenes() | filter:'estado':EstadoOrdenCompra.PENDIENTE).length }}
-          </span>
-          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pendientes</p>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pendientes</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().pendientes }}</p>
         </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
-    <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium">
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
-          <span class="w-6 h-6" [innerHTML]="icons.CHECK | safeHtml"></span>
+    <!-- Card 2: Recibidas -->
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+          <span class="w-6 h-6 block" [innerHTML]="icons.CHECK | safeHtml"></span>
         </div>
         <div>
-          <span class="text-2xl font-black text-gray-800">
-            {{ (comprasService.ordenes() | filter:'estado':EstadoOrdenCompra.RECIBIDA).length }}
-          </span>
-          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recibidas</p>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recibidas</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().recibidas }}</p>
         </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
-    <div class="bg-primary-900 text-white p-6 rounded-3xl shadow-premium md:col-span-2">
-      <div class="flex items-center gap-6">
-        <div class="w-12 h-12 bg-white/10 text-primary-300 rounded-2xl flex items-center justify-center">
-          <span class="w-6 h-6" [innerHTML]="icons.CART | safeHtml"></span>
+    <!-- Card 3: Inversión Total (USD) -->
+    <div class="bg-primary-900 p-6 rounded-3xl shadow-lg relative overflow-hidden group md:col-span-2">
+      <div class="absolute -right-4 -top-4 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
+      <div class="flex items-center gap-6 relative z-10">
+        <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-primary-300">
+          <span class="w-8 h-8 block" [innerHTML]="icons.CART | safeHtml"></span>
         </div>
         <div>
-          <span class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em]">Inversión Total Estimada</span>
+          <p class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em] mb-1">Inversión Total en Compras</p>
           <div class="flex items-baseline gap-2">
-            <span class="text-xs font-bold text-primary-300">PEN</span>
-            <span class="text-2xl font-black text-white">S/ 0.00</span>
+            <span class="text-3xl font-black text-white">$ {{ stats().inversionTotal.toFixed(2) }}</span>
+            <span class="text-xs font-bold text-primary-300 uppercase">USD</span>
           </div>
         </div>
       </div>
@@ -55,7 +64,7 @@
   </div>
 
   <!-- Barra de Búsqueda -->
-  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium animate-slide-up">
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium animate-slide-up" style="animation-delay: 100ms">
     <div class="relative group">
       <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
         <span class="w-5 h-5 block" [innerHTML]="icons.SEARCH | safeHtml"></span>
@@ -65,21 +74,49 @@
         [(ngModel)]="searchTerm"
         (ngModelChange)="onSearchChange($event)"
         placeholder="Buscar por número de orden, proveedor o factura..."
-        class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium"
+        class="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium"
       />
+      @if (searchTerm) {
+        <button 
+          (click)="searchTerm = ''; onSearchChange('')"
+          class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+        >
+          <span class="w-5 h-5 block" [innerHTML]="icons.CANCEL | safeHtml"></span>
+        </button>
+      }
     </div>
   </div>
 
-  <!-- Tabla -->
-  <div class="animate-slide-up" style="animation-delay: 100ms">
-    <app-table
-      [columns]="columns"
-      [data]="comprasService.ordenes() | filter:searchTerm"
-      [actions]="actions"
-      [loading]="comprasService.loading()"
-      emptyCtaLabel="Crear Nueva Orden"
-      emptyCtaIcon="ADD"
-      (emptyCtaClicked)="crearNueva()"
-    ></app-table>
+  <!-- Tabla o Skeletons -->
+  <div class="animate-slide-up" style="animation-delay: 200ms">
+    @if (comprasService.loading()) {
+      <div class="bg-white rounded-3xl border border-gray-100 p-8 space-y-6">
+        <div class="flex gap-4">
+          <app-skeleton width="120px" height="2rem"></app-skeleton>
+          <app-skeleton width="180px" height="2rem"></app-skeleton>
+        </div>
+        <div class="space-y-4">
+          @for (i of [1,2,3,4,5]; track i) {
+            <div class="flex items-center gap-4 border-b border-gray-50 pb-4">
+              <app-skeleton width="60px" height="1.5rem"></app-skeleton>
+              <div class="flex-1">
+                <app-skeleton width="40%" height="1rem"></app-skeleton>
+              </div>
+              <app-skeleton width="100px" height="1.5rem"></app-skeleton>
+              <app-skeleton width="120px" height="2rem"></app-skeleton>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <app-table
+        [columns]="columns"
+        [data]="comprasService.ordenes() | filter:searchTerm"
+        [actions]="actions"
+        emptyCtaLabel="Crear Nueva Orden"
+        emptyCtaIcon="ADD"
+        (emptyCtaClicked)="crearNueva()"
+      ></app-table>
+    }
   </div>
 </div>

@@ -108,3 +108,4 @@ export class LotesListComponent implements OnInit {
     }
 }
 
+

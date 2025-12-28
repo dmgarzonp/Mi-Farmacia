@@ -6,6 +6,7 @@ import { ProductosService } from '../../services/productos.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { TableComponent, TableColumn, TableAction } from '../../../../shared/components/table/table.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton.component';
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { PersistenceService } from '../../../../shared/services/persistence.service';
@@ -21,7 +22,7 @@ import { Producto } from '../../../../core/models';
 @Component({
     selector: 'app-productos-list',
     standalone: true,
-    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe],
+    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe, SkeletonComponent],
     templateUrl: './productos-list.component.html',
     styles: []
 })

@@ -1,10 +1,11 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ComprasService } from '../../services/compras.service';
 import { TableComponent, TableColumn, TableAction } from '../../../../shared/components/table/table.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton.component';
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { PersistenceService } from '../../../../shared/services/persistence.service';
@@ -20,7 +21,7 @@ import { OrdenCompra, EstadoOrdenCompra } from '../../../../core/models';
 @Component({
     selector: 'app-ordenes-list',
     standalone: true,
-    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe, FilterPipe],
+    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe, FilterPipe, SkeletonComponent],
     templateUrl: './ordenes-list.component.html',
     styles: []
 })
@@ -34,6 +35,17 @@ export class OrdenesListComponent implements OnInit {
     icons = APP_ICONS;
     searchTerm = '';
     EstadoOrdenCompra = EstadoOrdenCompra;
+
+    // Totales calculados para KPIs
+    stats = computed(() => {
+        const ordenes = this.comprasService.ordenes();
+        return {
+            total: ordenes.length,
+            pendientes: ordenes.filter(o => o.estado === EstadoOrdenCompra.PENDIENTE).length,
+            recibidas: ordenes.filter(o => o.estado === EstadoOrdenCompra.RECIBIDA).length,
+            inversionTotal: ordenes.reduce((acc, o) => acc + (o.total || 0), 0)
+        };
+    });
 
     columns: TableColumn<OrdenCompra>[] = [
         {

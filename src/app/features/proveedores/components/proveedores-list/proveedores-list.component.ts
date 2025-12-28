@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { ProveedoresService } from '../../services/proveedores.service';
 import { TableComponent, TableColumn, TableAction } from '../../../../shared/components/table/table.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton.component';
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { PersistenceService } from '../../../../shared/services/persistence.service';
@@ -19,7 +20,7 @@ import { Proveedor } from '../../../../core/models';
 @Component({
     selector: 'app-proveedores-list',
     standalone: true,
-    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe],
+    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe, SkeletonComponent],
     templateUrl: './proveedores-list.component.html'
 })
 export class ProveedoresListComponent implements OnInit {
@@ -31,6 +32,16 @@ export class ProveedoresListComponent implements OnInit {
 
     icons = APP_ICONS;
     searchTerm = signal('');
+
+    // KPIs calculados
+    stats = computed(() => {
+        const list = this.proveedoresService.proveedores();
+        return {
+            total: list.length,
+            conRuc: list.filter(p => !!p.ruc).length,
+            sinContacto: list.filter(p => !p.nombreContacto).length
+        };
+    });
 
     columns: TableColumn<Proveedor>[] = [
         {
