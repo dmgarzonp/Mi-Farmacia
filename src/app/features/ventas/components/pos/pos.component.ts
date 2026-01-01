@@ -12,6 +12,9 @@ import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
 import { Producto, Lote, Cliente, DetalleVenta, Venta, Presentacion } from '../../../../core/models';
+import { RideService } from '../../../../core/services/ride.service';
+import { ModalComponent } from '../../../../shared/components/modal/modal.component';
+import { ClienteFormComponent } from '../../../clientes/components/cliente-form/cliente-form.component';
 
 interface CartItem {
     producto: Producto;
@@ -26,7 +29,18 @@ interface CartItem {
 @Component({
     selector: 'app-pos',
     standalone: true,
-    imports: [CommonModule, FormsModule, ReactiveFormsModule, AutocompleteComponent, ButtonComponent, InputComponent, SafeHtmlPipe, CurrencyFormatPipe],
+    imports: [
+        CommonModule, 
+        FormsModule, 
+        ReactiveFormsModule, 
+        AutocompleteComponent, 
+        ButtonComponent, 
+        InputComponent, 
+        SafeHtmlPipe, 
+        CurrencyFormatPipe,
+        ModalComponent,
+        ClienteFormComponent
+    ],
     providers: [CurrencyFormatPipe],
     templateUrl: './pos.component.html',
     styles: [`:host { display: block; height: 100%; }`]
@@ -38,17 +52,40 @@ export class PosComponent implements OnInit {
     private clientesService = inject(ClientesService);
     private alertService = inject(AlertService);
     private currencyPipe = inject(CurrencyFormatPipe);
+    private rideService = inject(RideService);
     
     icons = APP_ICONS;
     cart = signal<CartItem[]>([]);
     selectedClienteId = signal<number | null>(null);
     metodoPago = signal<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo');
+    tipoComprobante = signal<'01' | '00'>('01'); // 01: Factura (SRI), 00: Nota de Venta / Consumidor Final
+    showModalCliente = signal(false);
     guardando = signal(false);
 
-    // Totales calculados
-    subtotal = computed(() => this.cart().reduce((acc, item) => acc + item.subtotal, 0));
-    igv = computed(() => this.subtotal() * 0.18);
-    total = computed(() => this.subtotal() + this.igv());
+    // Totales calculados (Fase 1: Inteligencia Fiscal Ecuador - Robustecido)
+    subtotalBase0 = computed(() => {
+        const cart = this.cart();
+        console.log('Cart updated:', cart);
+        const items = cart.filter(item => {
+            const tarifa = Number(item.producto.tarifaIva ?? 0);
+            return tarifa === 0 || tarifa === 6 || tarifa === 7;
+        });
+        const total = items.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+        console.log('Subtotal 0%:', total);
+        return total;
+    });
+
+    subtotalBase15 = computed(() => {
+        const cart = this.cart();
+        const items = cart.filter(item => Number(item.producto.tarifaIva ?? 0) === 2);
+        const total = items.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+        console.log('Subtotal 15%:', total);
+        return total;
+    });
+
+    montoIva15 = computed(() => Number(this.subtotalBase15() * 0.15));
+
+    total = computed(() => Number(this.subtotalBase0()) + Number(this.subtotalBase15()) + Number(this.montoIva15()));
 
     // Mapeos para Autocomplete
     get productosItems() {
@@ -73,7 +110,7 @@ export class PosComponent implements OnInit {
                             id: pres.id, // IMPORTANTE: El ID ahora es de la presentación
                             productId: p.id,
                             label: `${p.nombreComercial} - ${pres.nombreDescriptivo}`,
-                            sublabel: `${stockLabel} | ${this.currencyPipe.transform(pres.precioVentaCaja)}`
+                            sublabel: `${stockLabel} | ${this.currencyPipe.transform(pres.precioVentaCaja)} | ${p.tarifaIva === 2 ? 'IVA 15%' : 'IVA 0%'}`
                         });
                     }
                 });
@@ -97,6 +134,12 @@ export class PosComponent implements OnInit {
         ]);
     }
 
+    onClienteGuardado(clienteId: number) {
+        this.selectedClienteId.set(clienteId);
+        this.showModalCliente.set(false);
+        this.clientesService.cargarClientes(); // Refrescar lista de autocomplete
+    }
+
     async onProductoSelected(event: any) {
         if (!event || !event.id) return;
 
@@ -106,6 +149,10 @@ export class PosComponent implements OnInit {
 
         const presentacion = producto.presentaciones.find(pres => pres.id === event.id);
         if (!presentacion) return;
+
+        console.log('Producto seleccionado:', producto.nombreComercial);
+        console.log('Presentación data:', presentacion);
+        console.log('Precio Venta Caja:', presentacion.precioVentaCaja);
 
         // Lógica FEFO: Obtener lotes disponibles por presentación
         const lotes = await this.ventasService.obtenerLotesDisponibles(presentacion.id!);
@@ -135,8 +182,8 @@ export class PosComponent implements OnInit {
                     lote: loteSeleccionado,
                     cantidad: 1,
                     esFraccion: false,
-                    precioUnitario: presentacion.precioVentaCaja,
-                    subtotal: presentacion.precioVentaCaja
+                    precioUnitario: presentacion.precioVentaCaja || 0,
+                    subtotal: presentacion.precioVentaCaja || 0
                 }];
             }
         });
@@ -190,28 +237,59 @@ export class PosComponent implements OnInit {
 
     async finalizarVenta() {
         if (this.cart().length === 0) return;
+
+        // Validación de comprobante (Fase 3)
+        if (this.tipoComprobante() === '01' && !this.selectedClienteId()) {
+            this.alertService.warning('Para emitir una Factura RUC debe seleccionar un cliente.');
+            return;
+        }
         
         this.guardando.set(true);
         try {
+            const detalles: DetalleVenta[] = this.cart().map(item => ({
+                loteId: item.lote.id!,
+                presentacionId: item.presentacion.id!,
+                presentacionNombre: item.presentacion.nombreDescriptivo,
+                cantidad: item.esFraccion ? item.cantidad : item.cantidad * (item.presentacion.unidadesPorCaja || 1),
+                precioUnitario: item.precioUnitario,
+                subtotal: item.subtotal
+            }));
+
             const venta: Partial<Venta> = {
-                clienteId: this.selectedClienteId() || undefined,
-                subtotal: this.subtotal(),
-                impuestoTotal: this.igv(),
+                clienteId: this.tipoComprobante() === '01' ? (this.selectedClienteId() || undefined) : undefined,
+                subtotal: this.subtotalBase0() + this.subtotalBase15(),
+                impuestoTotal: this.montoIva15(),
                 total: this.total(),
                 metodoPago: this.metodoPago(),
-                detalles: this.cart().map(item => ({
-                    loteId: item.lote.id!,
-                    presentacionId: item.presentacion.id!,
-                    cantidad: item.esFraccion ? item.cantidad : item.cantidad * (item.presentacion.unidadesPorCaja || 1),
-                    precioUnitario: item.precioUnitario,
-                    subtotal: item.subtotal
-                }))
+                detalles
             };
 
-            await this.ventasService.registrarVenta(venta);
-            this.alertService.success('Venta realizada correctamente');
+            const ventaId = await this.ventasService.registrarVenta(venta);
+            
+            // --- Generación Automática de RIDE (Fase 3) ---
+            try {
+                let clienteData;
+                if (venta.clienteId) {
+                    clienteData = await this.clientesService.obtenerPorId(venta.clienteId);
+                }
+
+                const ventaCompleta = (await this.ventasService.cargarVentas(), this.ventasService.ventas().find(v => v.id === ventaId));
+                
+                if (ventaCompleta) {
+                    ventaCompleta.detalles = detalles;
+                    await this.rideService.generarFacturaPDF(ventaCompleta, clienteData || undefined);
+                    this.alertService.success('Venta realizada y RIDE generado correctamente');
+                } else {
+                    this.alertService.success('Venta realizada correctamente');
+                }
+            } catch (pdfError) {
+                console.error('Error al generar PDF:', pdfError);
+                this.alertService.warning('Venta guardada, pero hubo un error al generar el PDF.');
+            }
+
             this.cart.set([]);
             this.selectedClienteId.set(null);
+            this.tipoComprobante.set('00'); // Volver a Consumidor Final
             await this.productosService.cargarProductos(); // Recargar stock
         } catch (e: any) {
             this.alertService.error('Error al procesar venta: ' + e.message);

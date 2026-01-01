@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const Database = require('better-sqlite3');
 const initialData = require('./database/initial-data');
+const sriLogic = require('./sri-logic');
 
 let mainWindow;
 let db;
@@ -81,6 +82,7 @@ function createTables() {
       categoria_id INTEGER,
       requiere_receta BOOLEAN DEFAULT 0,
       es_controlado BOOLEAN DEFAULT 0,
+      tarifa_iva INTEGER DEFAULT 0, -- 0: 0%, 2: 15% (según catálogo SRI), 6: No Objeto, 7: Exento
       estado TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo')),
       FOREIGN KEY(laboratorio_id) REFERENCES laboratorios(id),
       FOREIGN KEY(categoria_id) REFERENCES categorias(id)
@@ -160,6 +162,12 @@ function createTables() {
       impuesto_total REAL DEFAULT 0 CHECK(impuesto_total >= 0),
       total REAL NOT NULL CHECK(total >= 0),
       estado TEXT DEFAULT 'completada' CHECK(estado IN ('completada', 'anulada')),
+      -- Facturación Electrónica SRI (Fase 2)
+      clave_acceso TEXT UNIQUE,
+      numero_autorizacion TEXT,
+      fecha_autorizacion TEXT,
+      estado_sri TEXT DEFAULT 'pendiente', -- pendiente, recibido, autorizado, rechazado, devuelto
+      xml_generado TEXT,
       cajero_id INTEGER,
       metodo_pago TEXT,
       FOREIGN KEY(cliente_id) REFERENCES clientes(id),
@@ -235,6 +243,34 @@ function createTables() {
         }
     } catch (e) {
         console.error('Error checking schema:', e);
+    }
+
+    // Asegurar columnas de facturación electrónica en ventas (Fase 2)
+    try {
+        const tableInfoVentas = db.prepare("PRAGMA table_info(ventas)").all();
+        if (!tableInfoVentas.some(col => col.name === 'clave_acceso')) {
+            console.log('Adding SRI columns to ventas...');
+            db.exec(`
+                ALTER TABLE ventas ADD COLUMN clave_acceso TEXT;
+                ALTER TABLE ventas ADD COLUMN numero_autorizacion TEXT;
+                ALTER TABLE ventas ADD COLUMN fecha_autorizacion TEXT;
+                ALTER TABLE ventas ADD COLUMN estado_sri TEXT DEFAULT 'pendiente';
+                ALTER TABLE ventas ADD COLUMN xml_generado TEXT;
+            `);
+        }
+    } catch (e) {
+        console.error('Error ensuring SRI columns in ventas:', e);
+    }
+
+    // Asegurar columna tarifa_iva en productos (Fase 1)
+    try {
+        const tableInfoProd = db.prepare("PRAGMA table_info(productos)").all();
+        if (!tableInfoProd.some(col => col.name === 'tarifa_iva')) {
+            console.log('Adding tarifa_iva column to productos...');
+            db.exec('ALTER TABLE productos ADD COLUMN tarifa_iva INTEGER DEFAULT 0;');
+        }
+    } catch (e) {
+        console.error('Error ensuring tarifa_iva column in productos:', e);
     }
 
     db.exec(schema);
@@ -425,6 +461,27 @@ function setupIpcHandlers() {
     // Obtener locale del sistema
     ipcMain.handle('app:getLocale', () => {
         return app.getLocale();
+    });
+
+    // --- SRI FACTURACIÓN ELECTRÓNICA ---
+    ipcMain.handle('sri:generar-xml', async (event, { venta, config, cliente }) => {
+        try {
+            const xml = sriLogic.generarXmlFactura(venta, config, cliente);
+            return { success: true, data: xml };
+        } catch (error) {
+            console.error('Error SRI Generar XML:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('sri:firmar-xml', async (event, { xml, rutaP12, password }) => {
+        try {
+            const xmlFirmado = await sriLogic.firmarXml(xml, rutaP12, password);
+            return { success: true, data: xmlFirmado };
+        } catch (error) {
+            console.error('Error SRI Firmar XML:', error);
+            return { success: false, error: error.message };
+        }
     });
 
     // Control de Ventana (Barra de título personalizada)

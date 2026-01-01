@@ -36,6 +36,12 @@ export class ClientesService {
         return res.lastInsertRowid;
     }
 
+    async obtenerPorId(id: number): Promise<Cliente | null> {
+        const sql = `SELECT * FROM clientes WHERE id = ?`;
+        const result = await this.db.get<any>(sql, [id]);
+        return result ? this.db.toCamelCase(result) : null;
+    }
+
     async buscar(termino: string): Promise<Cliente[]> {
         const sql = `
             SELECT * FROM clientes 
@@ -47,6 +53,7 @@ export class ClientesService {
         return this.db.toCamelCase(result);
     }
 }
+
 
 
 

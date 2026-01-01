@@ -1,6 +1,6 @@
 <div class="h-full flex flex-col gap-6 animate-fade-in pb-6">
   <!-- Top Bar: Buscador Principal -->
-  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium flex items-center gap-6">
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium flex items-center gap-6 relative z-[50]">
     <div class="flex-1">
       <app-autocomplete
         [items]="productosItems"
@@ -42,6 +42,11 @@
               <!-- Badge de modo de venta -->
               <span class="px-1.5 py-0.5 bg-primary-100 text-primary-600 text-[7px] font-black rounded uppercase">
                 {{ item.esFraccion ? 'Por Unid.' : 'Por Caja' }}
+              </span>
+              <!-- Badge de IVA (Fase 3) -->
+              <span [class]="item.producto.tarifaIva === 2 ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'"
+                class="px-1.5 py-0.5 text-[7px] font-black rounded border uppercase">
+                IVA {{ item.producto.tarifaIva === 2 ? '15%' : '0%' }}
               </span>
             </div>
             <p class="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Vence: {{ item.lote.fechaVencimiento }}</p>
@@ -100,17 +105,47 @@
     <!-- Panel Derecho: Checkout -->
     <div class="w-full lg:w-[360px] flex flex-col gap-4 shrink-0">
       <!-- Selección de Cliente -->
-      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium">
+      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium relative z-[30]">
         <h3 class="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
           <span class="w-4 h-4 text-primary-500" [innerHTML]="icons.USERS | safeHtml"></span>
-          Información del Cliente
+          Información del Comprobante
         </h3>
-        <app-autocomplete
-          [items]="clientesItems"
-          [(ngModel)]="selectedClienteId"
-          placeholder="Buscar cliente..."
-        ></app-autocomplete>
-        <p class="text-[8px] text-gray-400 mt-2 italic uppercase text-center font-medium tracking-wider">Opcional para boletas genéricas</p>
+        
+        <!-- Tipo de Comprobante (Fase 3) -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button (click)="tipoComprobante.set('00')"
+            [class]="tipoComprobante() === '00' ? 'bg-primary-600 text-white border-primary-700 shadow-md shadow-primary-100' : 'bg-white text-slate-500 border-slate-200'"
+            class="py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all">
+            Cons. Final
+          </button>
+          <button (click)="tipoComprobante.set('01')"
+            [class]="tipoComprobante() === '01' ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-100' : 'bg-white text-slate-500 border-slate-200'"
+            class="py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all">
+            Factura RUC
+          </button>
+        </div>
+
+        @if (tipoComprobante() === '01') {
+          <div class="flex gap-2">
+            <div class="flex-1">
+              <app-autocomplete
+                [items]="clientesItems"
+                [(ngModel)]="selectedClienteId"
+                placeholder="Buscar cliente..."
+              ></app-autocomplete>
+            </div>
+            <button (click)="showModalCliente.set(true)" 
+              class="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl border border-primary-100 flex items-center justify-center hover:bg-primary-100 transition-colors"
+              title="Registrar nuevo cliente">
+              <span class="w-5 h-5" [innerHTML]="icons.ADD | safeHtml"></span>
+            </button>
+          </div>
+          <p class="text-[8px] text-gray-400 mt-2 italic uppercase text-center font-medium tracking-wider">Se requiere RUC/Cédula para Factura</p>
+        } @else {
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Venta rápida sin datos</span>
+          </div>
+        }
       </div>
 
       <!-- Resumen y Pago -->
@@ -120,13 +155,17 @@
         <h3 class="text-[9px] font-black text-primary-400 uppercase tracking-[0.3em] mb-4 relative z-10">Resumen de Venta</h3>
 
         <div class="space-y-3 relative z-10">
-          <div class="flex justify-between items-center text-primary-100/60 text-xs font-medium uppercase tracking-widest">
-            <span>Subtotal</span>
-            <span>{{ subtotal() | currencyFormat }}</span>
+          <div class="flex justify-between items-center text-primary-100/60 text-[10px] font-medium uppercase tracking-widest">
+            <span>Subtotal 0%</span>
+            <span>{{ subtotalBase0() | currencyFormat }}</span>
           </div>
-          <div class="flex justify-between items-center text-primary-100/60 text-xs font-medium uppercase tracking-widest">
-            <span>Impuestos (18%)</span>
-            <span>{{ igv() | currencyFormat }}</span>
+          <div class="flex justify-between items-center text-primary-100/60 text-[10px] font-medium uppercase tracking-widest">
+            <span>Subtotal 15%</span>
+            <span>{{ subtotalBase15() | currencyFormat }}</span>
+          </div>
+          <div class="flex justify-between items-center text-primary-100/60 text-[10px] font-medium uppercase tracking-widest">
+            <span>Monto IVA 15%</span>
+            <span>{{ montoIva15() | currencyFormat }}</span>
           </div>
           
           <div class="pt-4 border-t border-white/10">
@@ -182,5 +221,17 @@
     </div>
   </div>
 </div>
+
+<!-- Modal Registro Rápido de Cliente (Fase 3) -->
+<app-modal
+  [isOpen]="showModalCliente()"
+  (closed)="showModalCliente.set(false)"
+  size="xl"
+>
+  <app-cliente-form
+    (saved)="onClienteGuardado($event)"
+    (cancelar)="showModalCliente.set(false)"
+  ></app-cliente-form>
+</app-modal>
 
 

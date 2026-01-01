@@ -1,0 +1,47 @@
+<div class="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+        Historial de Ventas
+        <span class="px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs font-bold border border-primary-100 uppercase tracking-widest">
+          Control Fiscal
+        </span>
+      </h1>
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Seguimiento de Comprobantes Electrónicos SRI</p>
+    </div>
+  </div>
+
+  <!-- KPI de Facturación -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Ventas</p>
+      <p class="text-2xl font-black text-slate-900">{{ ventasService.ventas().length }}</p>
+    </div>
+    <div class="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
+      <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Autorizadas</p>
+      <p class="text-2xl font-black text-emerald-700">0</p>
+    </div>
+    <div class="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
+      <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Pendientes SRI</p>
+      <p class="text-2xl font-black text-amber-700">{{ ventasService.ventas().length }}</p>
+    </div>
+    <div class="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm">
+      <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Rechazadas</p>
+      <p class="text-2xl font-black text-red-700">0</p>
+    </div>
+  </div>
+
+  <!-- Tabla de Ventas -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 rounded-[2rem] shadow-premium overflow-hidden">
+    <app-table
+      [columns]="columns"
+      [data]="ventasService.ventas()"
+      [loading]="ventasService.loading()"
+      [actions]="actions"
+      emptyCtaLabel="Ir al POS"
+      emptyCtaIcon="CART"
+    ></app-table>
+  </div>
+</div>
+

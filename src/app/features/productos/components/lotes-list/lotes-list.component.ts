@@ -6,7 +6,7 @@ import { TableComponent, TableColumn } from '../../../../shared/components/table
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
-import { Producto, Lote } from '../../../../core/models';
+import { Producto, Lote, MovimientoStock, TipoMovimiento } from '../../../../core/models';
 
 /**
  * Vista de Kardex / Lotes de un producto
@@ -27,6 +27,7 @@ export class LotesListComponent implements OnInit {
     icons = APP_ICONS;
     producto = signal<Producto | null>(null);
     lotes = signal<Lote[]>([]);
+    movimientos = signal<any[]>([]);
     loading = signal(true);
 
     totalStockConsolidado = computed(() => {
@@ -70,6 +71,43 @@ export class LotesListComponent implements OnInit {
         }
     ];
 
+    movimientoColumns: TableColumn<any>[] = [
+        {
+            key: 'fechaMovimiento',
+            label: 'Fecha y Hora',
+            sortable: true,
+            render: (row) => `<span class="text-xs text-gray-500">${new Date(row.fechaMovimiento).toLocaleString()}</span>`
+        },
+        {
+            key: 'tipo',
+            label: 'Operación',
+            render: (row) => this.getTipoMovimientoBadge(row.tipo)
+        },
+        {
+            key: 'presentacionNombre',
+            label: 'Presentación',
+            render: (row) => `<span class="text-[10px] font-bold text-gray-400 uppercase">${row.presentacionNombre}</span>`
+        },
+        {
+            key: 'loteNumero',
+            label: 'Lote',
+            render: (row) => `<span class="font-mono text-xs font-bold text-slate-600">${row.loteNumero}</span>`
+        },
+        {
+            key: 'cantidad',
+            label: 'Cantidad',
+            render: (row) => {
+                const esEntrada = [TipoMovimiento.ENTRADA_COMPRA, TipoMovimiento.AJUSTE_POSITIVO, TipoMovimiento.DEVOLUCION].includes(row.tipo);
+                return `<span class="font-black ${esEntrada ? 'text-emerald-600' : 'text-red-600'}">${esEntrada ? '+' : '-'}${row.cantidad}</span>`;
+            }
+        },
+        {
+            key: 'documentoReferencia',
+            label: 'Referencia',
+            render: (row) => `<span class="text-[10px] font-black text-primary-600 uppercase bg-primary-50 px-2 py-1 rounded border border-primary-100">${row.documentoReferencia || 'S/R'}</span>`
+        }
+    ];
+
     async ngOnInit() {
         const id = this.route.snapshot.paramMap.get('id');
         if (id) {
@@ -83,11 +121,16 @@ export class LotesListComponent implements OnInit {
     private async cargarDatos(id: number) {
         this.loading.set(true);
         try {
-            const prod = await this.productosService.obtenerPorId(id);
+            const [prod, movs] = await Promise.all([
+                this.productosService.obtenerPorId(id),
+                this.productosService.obtenerMovimientosProducto(id)
+            ]);
+
             if (prod && prod.presentaciones) {
                 this.producto.set(prod);
-                const allLotes: Lote[] = [];
+                this.movimientos.set(movs);
                 
+                const allLotes: Lote[] = [];
                 for (const pres of prod.presentaciones) {
                     const list = await this.productosService.obtenerLotes(pres.id!);
                     list.forEach(l => {
@@ -96,7 +139,6 @@ export class LotesListComponent implements OnInit {
                     });
                     allLotes.push(...list);
                 }
-                
                 this.lotes.set(allLotes);
             } else {
                 this.volver();
@@ -106,6 +148,20 @@ export class LotesListComponent implements OnInit {
         } finally {
             this.loading.set(false);
         }
+    }
+
+    getTipoMovimientoBadge(tipo: TipoMovimiento): string {
+        const config: Record<string, { label: string, class: string }> = {
+            [TipoMovimiento.ENTRADA_COMPRA]: { label: 'Compra', class: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+            [TipoMovimiento.SALIDA_VENTA]: { label: 'Venta', class: 'bg-blue-100 text-blue-700 border-blue-200' },
+            [TipoMovimiento.AJUSTE_POSITIVO]: { label: 'Ajuste (+)', class: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+            [TipoMovimiento.AJUSTE_NEGATIVO]: { label: 'Ajuste (-)', class: 'bg-red-50 text-red-600 border-red-100' },
+            [TipoMovimiento.VENCIMIENTO]: { label: 'Vencimiento', class: 'bg-red-100 text-red-700 border-red-200' },
+            [TipoMovimiento.DEVOLUCION]: { label: 'Devolución', class: 'bg-purple-100 text-purple-700 border-purple-200' }
+        };
+
+        const { label, class: cssClass } = config[tipo] || { label: tipo, class: 'bg-gray-100 text-gray-700' };
+        return `<span class="px-2 py-0.5 rounded text-[9px] font-black uppercase border ${cssClass}">${label}</span>`;
     }
 
     getVencimientoBadge(lote: Lote): string {

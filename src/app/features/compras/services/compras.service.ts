@@ -207,10 +207,35 @@ export class ComprasService {
         try {
             const sql = `UPDATE ordenes_compra SET estado = ?, observaciones = ? WHERE id = ?`;
             await this.db.run(sql, [estado, motivo || null, id]);
+            await this.db.run(sql, [estado, motivo || null, id]);
             await this.cargarOrdenes();
         } catch (err: any) {
             console.error('Error cambiando estado:', err);
             throw err;
+        }
+    }
+
+    /**
+     * Busca el proveedor que ha ofrecido el mejor precio histórico para una presentación
+     */
+    async obtenerMejorProveedorHistorico(presentacionId: number): Promise<{proveedorId: number, precio: number} | null> {
+        try {
+            const sql = `
+                SELECT 
+                    oc.proveedor_id,
+                    doc.precio_unitario as precio
+                FROM ordenes_compra_detalles doc
+                JOIN ordenes_compra oc ON doc.orden_compra_id = oc.id
+                WHERE doc.presentacion_id = ?
+                AND oc.estado = 'recibida'
+                ORDER BY doc.precio_unitario ASC
+                LIMIT 1
+            `;
+            const result = await this.db.get<any>(sql, [presentacionId]);
+            return result ? { proveedorId: result.proveedor_id, precio: result.precio } : null;
+        } catch (err) {
+            console.error('Error obteniendo mejor proveedor:', err);
+            return null;
         }
     }
 

@@ -103,8 +103,50 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
 
     ngOnInit(): void {
         this.initForm();
-        this.loadDependencies();
+        this.loadDependencies().then(() => {
+            // Revisar si vienen parámetros de reposición inteligente
+            this.checkQueryParams();
+        });
         this.checkEditMode();
+    }
+
+    private checkQueryParams(): void {
+        const proveedorId = this.route.snapshot.queryParamMap.get('proveedorId');
+        const presentacionId = this.route.snapshot.queryParamMap.get('presentacionId');
+        const precioSugerido = this.route.snapshot.queryParamMap.get('precioSugerido');
+
+        if (proveedorId) {
+            this.form.patchValue({ proveedorId: parseInt(proveedorId, 10) });
+        }
+
+        if (presentacionId) {
+            const presId = parseInt(presentacionId, 10);
+            const precio = precioSugerido ? parseFloat(precioSugerido) : 0;
+            
+            // Buscar la presentación para obtener sus datos
+            let presData: any = null;
+            for (const p of this.productosService.productos()) {
+                const found = p.presentaciones?.find(pr => pr.id === presId);
+                if (found) {
+                    presData = found;
+                    break;
+                }
+            }
+
+            const item = this.fb.group({
+                presentacionId: [presId, Validators.required],
+                cantidad: [1, [Validators.required, Validators.min(0.01)]],
+                precioUnitario: [precio || presData?.precioCompraCaja || 0, [Validators.required, Validators.min(0)]],
+                subtotal: [precio || presData?.precioCompraCaja || 0],
+                lote: [''],
+                fechaVencimiento: ['']
+            });
+            
+            this.detalles.push(item);
+            this.recalcularTotal();
+            
+            this.alertService.success('Se ha cargado el producto y el mejor proveedor detectado.');
+        }
     }
 
     private initForm(): void {

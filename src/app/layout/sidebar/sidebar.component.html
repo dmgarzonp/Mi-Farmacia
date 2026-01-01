@@ -47,7 +47,7 @@
       </ul>
     </div>
 
-    <!-- Sección Ventas -->
+    <!-- Sección Operaciones -->
     <div>
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
         Operaciones
@@ -55,13 +55,25 @@
       <ul class="space-y-1.5">
         <li>
           <a
-            routerLink="/ventas"
+            routerLink="/ventas/pos"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Ventas' : ''"
+            [title]="isCollapsed() ? 'Punto de Venta' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.CART | safeHtml"></span>
-            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Ventas</span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Punto de Venta</span>
+          </a>
+        </li>
+        <li>
+          <a
+            routerLink="/ventas"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [routerLinkActiveOptions]="{exact: true}"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Historial Ventas' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.REPORTS | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Historial Ventas</span>
           </a>
         </li>
         <li>
@@ -104,6 +116,26 @@
           >
             <span class="w-5 h-5" [innerHTML]="icons.TRUCK | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Proveedores</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Sección Configuración -->
+    <div>
+      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
+        Ajustes
+      </div>
+      <ul class="space-y-1.5">
+        <li>
+          <a
+            routerLink="/configuracion/sri"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Configuración SRI' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.VERIFIED | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Factura Electrónica</span>
           </a>
         </li>
       </ul>

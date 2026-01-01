@@ -22,11 +22,6 @@ export const routes: Routes = [
         data: { breadcrumb: 'Ventas' }
     },
     {
-        path: 'ventas',
-        component: DashboardComponent, // Placeholder
-        data: { breadcrumb: 'Ventas' }
-    },
-    {
         path: 'productos',
         loadChildren: () => import('./features/productos/productos.routes').then(m => m.productosRoutes),
         data: { breadcrumb: 'Productos' }
@@ -53,7 +48,7 @@ export const routes: Routes = [
     },
     {
         path: 'configuracion',
-        component: DashboardComponent, // Placeholder
+        loadChildren: () => import('./features/configuracion/configuracion.routes').then(m => m.configuracionRoutes),
         data: { breadcrumb: 'Configuración' }
     },
     {

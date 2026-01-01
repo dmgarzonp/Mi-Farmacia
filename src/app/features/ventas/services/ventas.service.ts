@@ -1,24 +1,55 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { DatabaseService } from '../../../core/services/database.service';
 import { Venta, DetalleVenta, TipoMovimiento, EstadoVenta, Lote } from '../../../core/models';
+import { SriService } from '../../../core/services/sri.service';
 
 @Injectable({
     providedIn: 'root'
 })
 export class VentasService {
     private db = inject(DatabaseService);
+    private sriService = inject(SriService);
     
     ventas = signal<Venta[]>([]);
     loading = signal<boolean>(false);
 
     /**
-     * Carga el historial de ventas
+     * Obtiene el siguiente secuencial de venta para la facturación electrónica
+     */
+    async obtenerSiguienteSecuencial(): Promise<number> {
+        const sql = `SELECT MAX(id) as max_id FROM ventas`;
+        const result = await this.db.get<any>(sql);
+        return (result?.max_id || 0) + 1;
+    }
+
+    /**
+     * Obtiene los detalles de una venta específica para el XML
+     */
+    async obtenerDetallesVenta(ventaId: number): Promise<DetalleVenta[]> {
+        const sql = `
+            SELECT 
+                d.*, 
+                pres.nombre_descriptivo as presentacion_nombre,
+                prod.tarifa_iva
+            FROM ventas_detalles d
+            JOIN presentaciones pres ON d.presentacion_id = pres.id
+            JOIN productos prod ON pres.producto_id = prod.id
+            WHERE d.venta_id = ?
+        `;
+        const result = await this.db.query<any>(sql, [ventaId]);
+        return this.db.toCamelCase(result);
+    }
+
+    /**
+     * Carga el historial de ventas completo con datos SRI
      */
     async cargarVentas(): Promise<void> {
         this.loading.set(true);
         try {
             const sql = `
-                SELECT v.*, c.nombre_completo as cliente_nombre 
+                SELECT 
+                    v.*, 
+                    c.nombre_completo as cliente_nombre 
                 FROM ventas v 
                 LEFT JOIN clientes c ON v.cliente_id = c.id 
                 ORDER BY v.fecha_venta DESC
@@ -26,7 +57,7 @@ export class VentasService {
             const result = await this.db.query<any>(sql);
             this.ventas.set(this.db.toCamelCase(result));
         } catch (e) {
-            console.error(e);
+            console.error('Error cargando historial de ventas:', e);
         } finally {
             this.loading.set(false);
         }
@@ -48,17 +79,26 @@ export class VentasService {
 
     /**
      * Registra una venta completa
-     * 1. Inserta en ventas
-     * 2. Inserta detalles
-     * 3. Descuenta stock de lotes
-     * 4. Registra movimientos de stock
+     * 1. Genera Clave de Acceso SRI
+     * 2. Inserta en ventas
+     * 3. Inserta detalles
+     * 4. Descuenta stock de lotes
+     * 5. Registra movimientos de stock
      */
     async registrarVenta(venta: Partial<Venta>): Promise<number> {
         try {
-            // 1. Cabecera
+            // 1. Lógica Fiscal SRI: Generar Clave de Acceso
+            const secuencial = await this.obtenerSiguienteSecuencial();
+            const fechaActual = new Date();
+            const claveAcceso = this.sriService.generarClaveAcceso(fechaActual, '01', secuencial);
+
+            // 2. Cabecera con Clave de Acceso
             const sqlVenta = `
-                INSERT INTO ventas (cliente_id, subtotal, impuesto_total, total, metodo_pago, estado)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO ventas (
+                    cliente_id, subtotal, impuesto_total, total, 
+                    metodo_pago, estado, clave_acceso, estado_sri
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const resVenta = await this.db.run(sqlVenta, [
                 venta.clienteId || null,
@@ -66,11 +106,13 @@ export class VentasService {
                 venta.impuestoTotal,
                 venta.total,
                 venta.metodoPago,
-                EstadoVenta.COMPLETADA
+                EstadoVenta.COMPLETADA,
+                claveAcceso,
+                'pendiente'
             ]);
             const ventaId = resVenta.lastInsertRowid;
 
-            // 2. Detalles y Stock
+            // 3. Detalles y Stock
             if (venta.detalles) {
                 for (const det of venta.detalles) {
                     const sqlDet = `
@@ -100,7 +142,7 @@ export class VentasService {
                         det.loteId,
                         -det.cantidad,
                         `V-${ventaId}`,
-                        `Venta registrada #${ventaId}`
+                        `Venta registrada #${ventaId} (Clave: ${claveAcceso.substring(0, 10)}...)`
                     ]);
                 }
             }

@@ -20,23 +20,28 @@ export class CurrencyFormatPipe implements PipeTransform {
   }
 
   private async init() {
-    this.locale = await this.db.getLocale();
-    this.formatter = new Intl.NumberFormat(this.locale, {
+    try {
+      this.locale = await this.db.getLocale();
+    } catch (e) {
+      this.locale = 'es-EC';
+    }
+    
+    // Forzar siempre USD para Ecuador
+    this.formatter = new Intl.NumberFormat('es-EC', {
       style: 'currency',
-      currency: this.getCurrencyForLocale(this.locale),
-      currencyDisplay: 'symbol', // Forzar el uso de símbolos como $ en lugar de códigos como USD
+      currency: 'USD',
+      currencyDisplay: 'symbol',
       minimumFractionDigits: 2
     });
   }
 
   transform(value: number | string | null | undefined): string {
-    if (value === null || value === undefined) return '';
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num)) return '';
+    if (value === null || value === undefined) return '$ 0.00';
+    let num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) num = 0;
 
-    // Si aún no se ha inicializado el formateador, usamos un fallback básico sin moneda quemada
     if (!this.formatter) {
-      return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return `$ ${num.toFixed(2)}`;
     }
 
     return this.formatter.format(num);
@@ -58,19 +63,17 @@ export class CurrencyFormatPipe implements PipeTransform {
       'MX': 'MXN'
     };
     
-    // Extraer la región de forma más robusta (ej: de es-PE, es_PE.UTF-8 o en-US extraer PE o US)
-    // Buscamos cualquier par de letras mayúsculas que representen el país
+    // Extraer la región
     const match = locale.match(/([a-z]{2})[-_]([a-z]{2})/i);
     if (match && match[2]) {
       const region = match[2].toUpperCase();
       if (map[region]) return map[region];
     }
     
-    // Fallback por si el locale es solo la región o algo no estándar
-    const cleanLocale = locale.split(/[-_.]/)[0].toUpperCase();
-    if (map[cleanLocale]) return map[cleanLocale];
+    // Si el locale contiene EC es Ecuador (USD)
+    if (locale.toUpperCase().includes('EC')) return 'USD';
     
-    return 'PEN'; // Fallback final
+    return 'USD'; // Fallback a Dólares por defecto para Ecuador
   }
 }
 

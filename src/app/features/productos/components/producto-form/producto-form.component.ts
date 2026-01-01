@@ -140,6 +140,7 @@ export class ProductoFormComponent implements OnInit {
             laboratorioId: [''],
             codigoInterno: [''],
             categoriaId: ['', Validators.required],
+            tarifaIva: [0, Validators.required], // 0% por defecto (medicamentos)
             requiereReceta: [false],
             esControlado: [false],
             presentaciones: this.fb.array([])
@@ -309,6 +310,7 @@ export class ProductoFormComponent implements OnInit {
                     laboratorioId: producto.laboratorioId,
                     codigoInterno: producto.codigoInterno || '',
                     categoriaId: producto.categoriaId,
+                    tarifaIva: producto.tarifaIva || 0,
                     requiereReceta: producto.requiereReceta,
                     esControlado: producto.esControlado
                 });

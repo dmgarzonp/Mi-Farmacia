@@ -115,6 +115,7 @@ export interface Producto {
     categoriaNombre?: string; // Virtual
     requiereReceta: boolean;
     esControlado: boolean;
+    tarifaIva: number; // 0: 0%, 2: 15% (SRI), 6: No Objeto, 7: Exento
     estado: EstadoRegistro;
     presentaciones?: Presentacion[]; // Virtual
 }
@@ -135,6 +136,7 @@ export interface Presentacion {
     codigoBarras?: string;
     vencimientoPredeterminadoMeses?: number;
     stockTotal?: number; // Virtual (suma de lotes)
+    proximoVencimiento?: string; // Virtual (fecha más cercana de lotes con stock)
 }
 
 /**
@@ -207,7 +209,34 @@ export interface Venta {
     estado: EstadoVenta;
     cajeroId?: number;
     metodoPago?: string;
+    
+    // Facturación Electrónica (Fase 2)
+    claveAcceso?: string;
+    numeroAutorizacion?: string;
+    fechaAutorizacion?: string;
+    estadoSre?: 'pendiente' | 'recibido' | 'autorizado' | 'rechazado' | 'devuelto';
+    xmlGenerado?: string;
+    
     detalles?: DetalleVenta[];
+}
+
+/**
+ * Configuración para Facturación Electrónica SRI
+ */
+export interface SriConfig {
+    ruc: string;
+    razonSocial: string;
+    nombreComercial: string;
+    establecimiento: string; // Ej: "001"
+    puntoEmision: string;    // Ej: "001"
+    direccionMatriz: string;
+    ambiente: '1' | '2';     // 1: Pruebas, 2: Producción
+    tipoEmision: '1';        // Siempre 1 (Normal)
+    obligadoContabilidad: 'SI' | 'NO';
+    agenteRetencion?: string;
+    contribuyenteEspecial?: string;
+    rutaFirmaP12?: string;
+    passwordFirma?: string;
 }
 
 /**
@@ -218,8 +247,10 @@ export interface DetalleVenta {
     ventaId?: number;
     loteId: number;
     presentacionId?: number; // Virtual/Referencia
+    presentacionNombre?: string; // Virtual (Fase 3: RIDE)
     loteCodigo?: string; // Virtual
     productoNombre?: string; // Virtual
+    tarifaIva?: number; // Virtual (Fase 3: SRI XML)
     cantidad: number;
     precioUnitario: number;
     subtotal: number;

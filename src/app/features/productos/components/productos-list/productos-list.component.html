@@ -101,7 +101,10 @@
 
     <!-- Card 4: Vencimientos -->
     <div 
+      (click)="filterType = 'vencimiento'; applyFilter()"
       class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer"
+      [class.ring-2]="filterType === 'vencimiento'"
+      [class.ring-indigo-500]="filterType === 'vencimiento'"
     >
       <div class="flex items-center gap-4 relative z-10">
         <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
@@ -115,6 +118,27 @@
       <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
   </div>
+
+  <!-- Contador Flotante de Faltantes -->
+  @if (pedidosService.count() > 0) {
+    <div class="fixed bottom-8 right-8 z-[100] animate-bounce-in">
+      <button 
+        (click)="showModalConsolidacion.set(true)"
+        class="bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl shadow-emerald-500/40 border-4 border-white flex items-center gap-3 hover:scale-105 active:scale-95 transition-all group"
+      >
+        <div class="relative">
+          <span class="w-6 h-6 block" [innerHTML]="icons.CART | safeHtml"></span>
+          <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+            {{ pedidosService.count() }}
+          </span>
+        </div>
+        <div class="text-left pr-2">
+          <p class="text-[9px] font-black uppercase tracking-widest leading-none opacity-80">Lista de</p>
+          <p class="text-xs font-black uppercase tracking-tight">Faltantes</p>
+        </div>
+      </button>
+    </div>
+  }
 
   <!-- Búsqueda y Filtros Premium -->
   <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium flex flex-col lg:flex-row gap-6 items-center animate-slide-up" style="animation-delay: 100ms">
@@ -328,23 +352,6 @@
     }
       </app-modal>
 
-      <!-- Modal de Edición/Creación de Producto -->
-      <app-modal
-        [isOpen]="showModalEdicion()"
-        [title]="idProductoEdicion() ? 'Editar Producto' : 'Nuevo Producto'"
-        size="2xl"
-        (closed)="showModalEdicion.set(false)"
-      >
-        @if (showModalEdicion()) {
-          <app-producto-form 
-            [id]="idProductoEdicion() || undefined"
-            [isModalMode]="true"
-            (saved)="onProductoSaved()"
-            (cancelled)="showModalEdicion.set(false)"
-          ></app-producto-form>
-        }
-      </app-modal>
-
       <!-- Modal de Registro Rápido de Laboratorio -->
       <app-modal
         [isOpen]="showModalLaboratorios()"
@@ -372,6 +379,85 @@
             (guardado)="showModalCategorias.set(false)"
             (cancelar)="showModalCategorias.set(false)"
           ></app-categoria-quick-form>
+        }
+      </app-modal>
+
+      <!-- Modal de Consolidación de Pedidos -->
+      <app-modal
+        [isOpen]="showModalConsolidacion()"
+        title="Consolidar Pedidos de Faltantes"
+        size="lg"
+        (closed)="showModalConsolidacion.set(false)"
+      >
+        @if (showModalConsolidacion()) {
+          <div class="p-6 space-y-6">
+            <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-4">
+              <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
+                <span class="w-6 h-6" [innerHTML]="icons.BOXES | safeHtml"></span>
+              </div>
+              <div>
+                <p class="text-sm font-black text-emerald-900 uppercase tracking-tight">Consolidación Automática</p>
+                <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
+                  Se generarán borradores de órdenes de compra agrupados por proveedor.
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+              @for (item of pedidosService.items(); track item.presentacionId) {
+                <div class="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-200 transition-all group">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-slate-800 truncate">{{ item.productoNombre }}</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{{ item.presentacionNombre }}</p>
+                    @if (item.proveedorId) {
+                      <span class="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1 block">
+                        Mejor Proveedor Detectado
+                      </span>
+                    }
+                  </div>
+
+                  <div class="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                    <input 
+                      type="number" 
+                      [(ngModel)]="item.cantidad" 
+                      (change)="pedidosService.actualizarCantidad(item.presentacionId, item.cantidad)"
+                      class="w-16 bg-transparent text-center text-xs font-black text-slate-700 focus:outline-none"
+                    />
+                    <span class="text-[8px] font-black text-slate-400 uppercase pr-2">Cajas</span>
+                  </div>
+
+                  <button 
+                    (click)="pedidosService.removerItem(item.presentacionId)"
+                    class="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                  >
+                    <span class="w-4 h-4 block" [innerHTML]="icons.DELETE | safeHtml"></span>
+                  </button>
+                </div>
+              } @empty {
+                <div class="py-12 text-center">
+                  <p class="text-xs font-black text-slate-300 uppercase tracking-widest">La lista está vacía</p>
+                </div>
+              }
+            </div>
+
+            <div class="pt-6 border-t border-slate-100 flex items-center justify-between">
+              <app-button variant="secondary" (clicked)="pedidosService.limpiarTodo(); showModalConsolidacion.set(false)">
+                Vaciar Lista
+              </app-button>
+              
+              <div class="flex items-center gap-3">
+                <app-button variant="secondary" (clicked)="showModalConsolidacion.set(false)">Seguir Seleccionando</app-button>
+                <app-button 
+                  variant="primary" 
+                  [disabled]="pedidosService.count() === 0"
+                  (clicked)="generarOrdenesConsolidadas()"
+                  iconNameLeft="SAVE"
+                >
+                  Generar {{ pedidosService.count() }} Órdenes
+                </app-button>
+              </div>
+            </div>
+          </div>
         }
       </app-modal>
     </div>

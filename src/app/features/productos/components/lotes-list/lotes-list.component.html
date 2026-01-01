@@ -55,6 +55,27 @@
     ></app-table>
   </div>
 
+  <!-- Historial de Movimientos -->
+  <div class="animate-slide-up" style="animation-delay: 150ms">
+    <div class="flex items-center justify-between mb-6 px-4">
+      <div>
+        <h3 class="text-sm font-black text-gray-800 uppercase tracking-[0.2em] flex items-center">
+          <span class="w-1.5 h-4 bg-emerald-500 mr-3 rounded-full"></span>
+          Historial de Movimientos (Kardex)
+        </h3>
+        <p class="text-[10px] text-gray-400 font-bold uppercase mt-1">Entradas, salidas y ajustes registrados cronológicamente</p>
+      </div>
+    </div>
+
+    <app-table
+      [columns]="movimientoColumns"
+      [data]="movimientos()"
+      [loading]="loading()"
+      emptyCtaLabel="Realizar Movimiento"
+      emptyCtaIcon="ADD"
+    ></app-table>
+  </div>
+
   <!-- Informativo de Trazabilidad -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up" style="animation-delay: 200ms">
     <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl flex items-start gap-4">

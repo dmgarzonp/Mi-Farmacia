@@ -1,20 +1,23 @@
-<div [class]="isModalMode ? 'w-full' : 'max-w-[1400px] mx-auto pb-8 px-4'">
+<div [class]="isModalMode ? 'w-full' : 'max-w-[1550px] mx-auto pb-8 px-4'">
   <!-- Header Compacto -->
   @if (!isModalMode) {
-  <div class="flex items-center justify-between mb-6 animate-fade-in">
-    <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-[0.5rem] bg-emerald-600 text-white flex items-center justify-center shadow-lg">
-        <span class="w-6 h-6" [innerHTML]="icons.BOXES | safeHtml"></span>
+  <div class="flex items-center justify-between mb-8 animate-fade-in bg-white p-6 rounded-[0.5rem] border border-slate-200 shadow-sm">
+    <div class="flex items-center gap-5">
+      <div class="w-14 h-14 rounded-[0.5rem] bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-200">
+        <span class="w-7 h-7" [innerHTML]="icons.BOXES | safeHtml"></span>
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">
-        {{ isEditMode ? 'Editar' : 'Nuevo' }} Producto
-      </h1>
+      <div>
+        <h1 class="text-3xl font-black text-slate-900 tracking-tight">
+          {{ isEditMode ? 'Editar' : 'Nuevo' }} Producto
+        </h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Configuración del Catálogo Maestro</p>
+      </div>
     </div>
     <div class="flex items-center gap-3">
-      <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Cancelar</app-button>
+      <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Regresar</app-button>
       <app-button type="submit" variant="success" [disabled]="form.invalid || guardando" [loading]="guardando"
         iconNameLeft="SAVE" (clicked)="guardar()">
-        Guardar Todo
+        Guardar Producto
       </app-button>
     </div>
   </div>
@@ -24,7 +27,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
       <!-- COLUMNA IZQUIERDA: IDENTIFICACIÓN (3/12) -->
-      <div class="lg:col-span-3 space-y-4">
+      <div class="lg:col-span-3 space-y-4 relative z-[20]">
         <div class="bg-white border border-slate-200 rounded-[0.5rem] p-6 shadow-sm">
           <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
             <span class="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
@@ -52,6 +55,27 @@
 
               <app-autocomplete label="Categoría" placeholder="Seleccionar..." formControlName="categoriaId"
                 [items]="categoriasItems()" [required]="true"></app-autocomplete>
+            </div>
+
+            <!-- Selección de IVA (Fase 1: Inteligencia Fiscal) -->
+            <div class="space-y-2">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Impuesto (IVA)</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" 
+                  (click)="form.get('tarifaIva')?.setValue(0)"
+                  [class]="form.get('tarifaIva')?.value === 0 ? 'bg-emerald-600 text-white border-emerald-700 shadow-md shadow-emerald-100' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                  class="flex flex-col items-center justify-center p-2 rounded-[0.5rem] border transition-all">
+                  <span class="text-xs font-black">0%</span>
+                  <span class="text-[8px] uppercase font-bold opacity-80">Medicamentos</span>
+                </button>
+                <button type="button" 
+                  (click)="form.get('tarifaIva')?.setValue(2)"
+                  [class]="form.get('tarifaIva')?.value === 2 ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-100' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'"
+                  class="flex flex-col items-center justify-center p-2 rounded-[0.5rem] border transition-all">
+                  <span class="text-xs font-black">15%</span>
+                  <span class="text-[8px] uppercase font-bold opacity-80">Otros / Artículos</span>
+                </button>
+              </div>
             </div>
 
             <div class="space-y-3 pt-2">

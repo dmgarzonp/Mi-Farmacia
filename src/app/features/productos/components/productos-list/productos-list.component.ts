@@ -19,7 +19,9 @@ import { ExportService } from '../../../../shared/services/export.service';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
-import { Producto, EstadoRegistro } from '../../../../core/models';
+import { Producto, EstadoRegistro, Presentacion, EstadoOrdenCompra } from '../../../../core/models';
+import { ComprasService } from '../../../compras/services/compras.service';
+import { PedidosService } from '../../../../shared/services/pedidos.service';
 
 /**
  * Listado de Productos (Catálogo Maestro)
@@ -50,6 +52,8 @@ import { Producto, EstadoRegistro } from '../../../../core/models';
 export class ProductosListComponent implements OnInit {
     productosService = inject(ProductosService);
     categoriasService = inject(CategoriasService);
+    comprasService = inject(ComprasService);
+    pedidosService = inject(PedidosService);
     private router = inject(Router);
     private alertService = inject(AlertService);
     private confirmService = inject(ConfirmService);
@@ -68,10 +72,9 @@ export class ProductosListComponent implements OnInit {
     // Modales y selección
     selectedProducto = signal<Producto | null>(null);
     showModalDetalle = signal(false);
-    showModalEdicion = signal(false);
     showModalLaboratorios = signal(false);
     showModalCategorias = signal(false);
-    idProductoEdicion = signal<number | null>(null);
+    showModalConsolidacion = signal(false);
 
     // Configuración para Import/Export (Simplificada al modelo base)
     private readonly IMPORT_MAPPING: Record<string, keyof Producto> = {
@@ -81,13 +84,6 @@ export class ProductosListComponent implements OnInit {
     };
 
     columns: TableColumn<Producto>[] = [
-// ... resto de columnas ...
-        {
-            key: 'codigoInterno',
-            label: 'SKU',
-            width: '100px',
-            sortable: true
-        },
         {
             key: 'nombreComercial',
             label: 'Producto',
@@ -141,16 +137,25 @@ export class ProductosListComponent implements OnInit {
 
     actions: TableAction<Producto>[] = [
         {
+            label: 'Añadir a Pedido',
+            iconName: 'CART',
+            variant: 'success',
+            visible: (p) => {
+                const agotado = p.presentaciones?.some(pres => (pres.stockTotal || 0) <= 0);
+                const bajo = p.presentaciones?.some(pres => (pres.stockTotal || 0) <= (pres.stockMinimo || 0));
+                return !!(agotado || bajo) && p.estado === EstadoRegistro.ACTIVO;
+            },
+            handler: (producto) => {
+                if (producto.presentaciones?.length) {
+                    this.pedidosService.añadirItem(producto, producto.presentaciones[0]);
+                }
+            }
+        },
+        {
             label: 'Ver Ficha',
             iconName: 'VIEW',
             variant: 'secondary',
             handler: (producto) => this.verDetalle(producto)
-        },
-        {
-            label: 'Lotes / Kardex',
-            iconName: 'BOXES',
-            variant: 'primary',
-            handler: (producto) => this.verLotes(producto)
         },
         {
             label: 'Editar',
@@ -190,14 +195,23 @@ export class ProductosListComponent implements OnInit {
         this.router.navigate(['/productos', producto.id]);
     }
 
-    async onProductoSaved() {
-        this.showModalEdicion.set(false);
-        await this.productosService.cargarProductos();
-        this.applyFilter();
-        await this.loadStats();
-    }
-
     async ngOnInit() {
+        // Escuchar el evento personalizado desde los badges (renderizados vía HTML string)
+        window.addEventListener('prepararReposicion', (event: any) => {
+            const productoId = event.detail;
+            const producto = this.productosService.productos().find(p => p.id === productoId);
+            if (producto) this.prepararReposicion(producto);
+        });
+
+        // Evento para añadir a lista de faltantes
+        window.addEventListener('añadirAPedido', (event: any) => {
+            const productoId = event.detail;
+            const producto = this.productosService.productos().find(p => p.id === productoId);
+            if (producto && producto.presentaciones?.length) {
+                this.pedidosService.añadirItem(producto, producto.presentaciones[0]);
+            }
+        });
+
         // Recuperar filtros persistidos
         const savedFilters = this.persistenceService.get<any>('productos-filters');
         if (savedFilters) {
@@ -273,6 +287,19 @@ export class ProductosListComponent implements OnInit {
             case 'requiere-receta':
                 productos = productos.filter(p => p.requiereReceta);
                 break;
+            case 'vencimiento':
+                const hoy = new Date();
+                const limiteVencimiento = new Date();
+                limiteVencimiento.setMonth(hoy.getMonth() + 3);
+                
+                productos = productos.filter(p => 
+                    p.presentaciones && p.presentaciones.some(pres => {
+                        if (!pres.proximoVencimiento) return false;
+                        const fechaVenc = new Date(pres.proximoVencimiento);
+                        return fechaVenc <= limiteVencimiento && (pres.stockTotal || 0) > 0;
+                    })
+                );
+                break;
         }
 
         this.filteredProductos.set(productos);
@@ -315,38 +342,67 @@ export class ProductosListComponent implements OnInit {
     }
 
     getStatusBadges(producto: Producto): string {
-        let html = '<div class="flex flex-wrap gap-1">';
+        let html = '<div class="flex items-center flex-wrap gap-1">';
         
         const tieneAgotados = producto.presentaciones?.some(p => (p.stockTotal || 0) <= 0);
         const tieneBajos = producto.presentaciones?.some(p => (p.stockTotal || 0) <= (p.stockMinimo || 0));
+        
+        // Lógica de Vencimiento
+        const hoy = new Date();
+        const limiteVencimiento = new Date();
+        limiteVencimiento.setMonth(hoy.getMonth() + 3);
 
-        // Clase base para badges discretos: fondo blanco, texto y borde de color
-        const baseClass = 'px-1.5 py-0.5 text-[8px] font-black rounded border uppercase bg-white';
+        const tieneVencimientosProximos = producto.presentaciones?.some(p => {
+            if (!p.proximoVencimiento) return false;
+            const fechaVenc = new Date(p.proximoVencimiento);
+            return fechaVenc <= limiteVencimiento && fechaVenc >= hoy;
+        });
+
+        const tieneVencidos = producto.presentaciones?.some(p => {
+            if (!p.proximoVencimiento) return false;
+            const fechaVenc = new Date(p.proximoVencimiento);
+            return fechaVenc < hoy;
+        });
+
+        // BADGES INFORMATIVOS (Solo visual)
+        const baseBadge = 'px-1.5 py-0.5 text-[8px] font-black rounded border uppercase bg-white';
+        
+        if (tieneVencidos) {
+            html += `<span class="${baseBadge} text-red-700 border-red-600 bg-red-50">VENCIDO</span>`;
+        } else if (tieneVencimientosProximos) {
+            html += `<span class="${baseBadge} text-orange-700 border-orange-600 bg-orange-50">Por Vencer</span>`;
+        }
 
         if (tieneAgotados) {
-            html += `<span class="${baseClass} text-red-600 border-red-500">Sin Stock</span>`;
+            html += `<span class="${baseBadge} text-red-600 border-red-500">Sin Stock</span>`;
         } else if (tieneBajos) {
-            html += `<span class="${baseClass} text-amber-600 border-amber-500">Stock Bajo</span>`;
+            html += `<span class="${baseBadge} text-amber-600 border-amber-50">Stock Bajo</span>`;
         }
 
         if (producto.requiereReceta) {
-            html += `<span class="${baseClass} text-blue-600 border-blue-500">Receta</span>`;
+            html += `<span class="${baseBadge} text-blue-600 border-blue-500">Receta</span>`;
         }
         if (producto.esControlado) {
-            html += `<span class="${baseClass} text-purple-600 border-purple-500">Controlado</span>`;
+            html += `<span class="${baseBadge} text-purple-600 border-purple-500">Controlado</span>`;
         }
+
+        // IVA Badge (Fase 1)
+        if (producto.tarifaIva === 2) {
+            html += `<span class="${baseBadge} text-indigo-600 border-indigo-200 bg-indigo-50/30">IVA 15%</span>`;
+        } else {
+            html += `<span class="${baseBadge} text-emerald-600 border-emerald-200 bg-emerald-50/30">IVA 0%</span>`;
+        }
+
         html += '</div>';
         return html;
     }
 
     crearNuevo(): void {
-        this.idProductoEdicion.set(null);
-        this.showModalEdicion.set(true);
+        this.router.navigate(['/productos/nuevo']);
     }
 
     editar(producto: Producto): void {
-        this.idProductoEdicion.set(producto.id!);
-        this.showModalEdicion.set(true);
+        this.router.navigate(['/productos', producto.id, 'editar']);
     }
 
     gestionarCategorias(): void {
@@ -388,6 +444,89 @@ export class ProductosListComponent implements OnInit {
         } catch (error: any) {
             this.alertService.error('Error al reactivar: ' + error.message);
         }
+    }
+
+    /**
+     * Prepara una orden de compra para un producto con stock crítico
+     */
+    async prepararReposicion(producto: Producto) {
+        // Usar la primera presentación por defecto para la reposición
+        const presentacion = producto.presentaciones?.[0];
+        if (!presentacion) {
+            this.alertService.error('El producto no tiene presentaciones configuradas');
+            return;
+        }
+
+        this.alertService.info(`Buscando el mejor proveedor para ${producto.nombreComercial}...`);
+
+        try {
+            const mejorOpcion = await this.comprasService.obtenerMejorProveedorHistorico(presentacion.id!);
+            
+            this.router.navigate(['/compras/nueva'], { 
+                queryParams: { 
+                    proveedorId: mejorOpcion?.proveedorId || null,
+                    presentacionId: presentacion.id,
+                    precioSugerido: mejorOpcion?.precio || presentacion.precioCompraCaja
+                } 
+            });
+        } catch (error) {
+            // Si falla la búsqueda, vamos de todas formas a la pantalla de orden pero vacía
+            this.router.navigate(['/compras/nueva'], { 
+                queryParams: { 
+                    presentacionId: presentacion.id
+                } 
+            });
+        }
+    }
+
+    async generarOrdenesConsolidadas() {
+        const items = this.pedidosService.items();
+        if (items.length === 0) return;
+
+        const confirmed = await this.confirmService.ask({
+            title: 'Generar Órdenes de Compra',
+            message: `¿Desea crear borradores de órdenes de compra para los ${items.length} productos seleccionados?`,
+            variant: 'primary',
+            confirmText: 'Generar Borradores'
+        });
+
+        if (!confirmed) return;
+
+        this.alertService.info('Agrupando por proveedor...');
+        
+        // Agrupar items por proveedorId
+        const grupos = new Map<number | string, any[]>();
+        items.forEach(item => {
+            const key = item.proveedorId || 'sin-proveedor';
+            if (!grupos.has(key)) grupos.set(key, []);
+            grupos.get(key)?.push(item);
+        });
+
+        let creadas = 0;
+        for (const [proveedorId, productos] of grupos.entries()) {
+            if (proveedorId === 'sin-proveedor') continue;
+
+            const orden: any = {
+                proveedorId: proveedorId,
+                fechaEmision: new Date().toISOString().split('T')[0],
+                estado: EstadoOrdenCompra.BORRADOR,
+                observaciones: 'Generada automáticamente desde Lista de Faltantes',
+                detalles: productos.map(p => ({
+                    presentacionId: p.presentacionId,
+                    cantidad: p.cantidad,
+                    precioUnitario: p.precioSugerido,
+                    subtotal: p.cantidad * p.precioSugerido
+                }))
+            };
+
+            await this.comprasService.crear(orden);
+            creadas++;
+        }
+
+        this.alertService.success(`${creadas} Órdenes creadas en borrador. Revisa el módulo de Compras.`);
+        this.pedidosService.limpiarTodo();
+        this.showModalConsolidacion.set(false);
+        this.router.navigate(['/compras']);
     }
 
     // --- ACCIONES DE DATOS ---

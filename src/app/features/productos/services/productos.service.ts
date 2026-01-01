@@ -42,13 +42,27 @@ export class ProductosService {
             // Cargar presentaciones para cada producto
             for (const prod of productos) {
                 const presSql = `
-                    SELECT pres.*, 
-                    (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
-                    FROM presentaciones pres 
-                    WHERE pres.producto_id = ?
+                    SELECT 
+                        id, producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                        precio_compra_caja, precio_venta_unidad, precio_venta_caja, 
+                        stock_minimo, codigo_barras, vencimiento_predeterminado_meses,
+                        (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = presentaciones.id) as stock_total,
+                        (SELECT MIN(fecha_vencimiento) FROM lotes WHERE presentacion_id = presentaciones.id AND stock_actual > 0) as proximo_vencimiento
+                    FROM presentaciones 
+                    WHERE producto_id = ?
                 `;
                 const presResult = await this.db.query<any>(presSql, [prod.id]);
                 prod.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+                
+                // Debug para asegurar que los precios existan
+                prod.presentaciones.forEach(pres => {
+                    if (!pres.precioVentaCaja) {
+                        // Intento de rescate si toCamelCase falló o el campo vino diferente
+                        const raw: any = presResult.find((r: any) => r.id === pres.id);
+                        pres.precioVentaCaja = raw?.precio_venta_caja || 0;
+                        pres.precioVentaUnidad = raw?.precio_venta_unidad || 0;
+                    }
+                });
             }
 
             this.productos.set(productos);
@@ -79,13 +93,24 @@ export class ProductosService {
             
             // Cargar presentaciones
             const presSql = `
-                SELECT pres.*, 
-                (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
-                FROM presentaciones pres 
-                WHERE pres.producto_id = ?
+                SELECT 
+                    id, producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                    precio_compra_caja, precio_venta_unidad, precio_venta_caja, 
+                    stock_minimo, codigo_barras, vencimiento_predeterminado_meses,
+                    (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = presentaciones.id) as stock_total,
+                    (SELECT MIN(fecha_vencimiento) FROM lotes WHERE presentacion_id = presentaciones.id AND stock_actual > 0) as proximo_vencimiento
+                FROM presentaciones 
+                WHERE producto_id = ?
             `;
             const presResult = await this.db.query<any>(presSql, [id]);
             prodObj.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+
+            // Asegurar precios numéricos
+            prodObj.presentaciones.forEach(pres => {
+                const raw: any = presResult.find((r: any) => r.id === pres.id);
+                pres.precioVentaCaja = Number(raw?.precio_venta_caja || pres.precioVentaCaja || 0);
+                pres.precioVentaUnidad = Number(raw?.precio_venta_unidad || pres.precioVentaUnidad || 0);
+            });
 
             return prodObj;
         } catch (err: any) {
@@ -105,6 +130,27 @@ export class ProductosService {
             return this.db.toCamelCase(result) as Lote[];
         } catch (err: any) {
             console.error('Error obteniendo lotes de la presentación:', err);
+            throw err;
+        }
+    }
+
+    async obtenerMovimientosProducto(productoId: number): Promise<any[]> {
+        try {
+            const sql = `
+                SELECT 
+                    m.*,
+                    l.lote as lote_numero,
+                    pres.nombre_descriptivo as presentacion_nombre
+                FROM movimientos_stock m
+                JOIN lotes l ON m.lote_id = l.id
+                JOIN presentaciones pres ON l.presentacion_id = pres.id
+                WHERE pres.producto_id = ?
+                ORDER BY m.fecha_movimiento DESC
+            `;
+            const result = await this.db.query<any>(sql, [productoId]);
+            return this.db.toCamelCase(result);
+        } catch (err: any) {
+            console.error('Error obteniendo movimientos del producto:', err);
             throw err;
         }
     }
@@ -146,13 +192,23 @@ export class ProductosService {
 
             for (const prod of productos) {
                 const presSql = `
-                    SELECT pres.*, 
-                    (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
-                    FROM presentaciones pres 
-                    WHERE pres.producto_id = ?
+                    SELECT 
+                        id, producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                        precio_compra_caja, precio_venta_unidad, precio_venta_caja, 
+                        stock_minimo, codigo_barras, vencimiento_predeterminado_meses,
+                        (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = presentaciones.id) as stock_total
+                    FROM presentaciones 
+                    WHERE producto_id = ?
                 `;
                 const presResult = await this.db.query<any>(presSql, [prod.id]);
                 prod.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+
+                // Asegurar precios numéricos
+                prod.presentaciones.forEach(pres => {
+                    const raw: any = presResult.find((r: any) => r.id === pres.id);
+                    pres.precioVentaCaja = Number(raw?.precio_venta_caja || pres.precioVentaCaja || 0);
+                    pres.precioVentaUnidad = Number(raw?.precio_venta_unidad || pres.precioVentaUnidad || 0);
+                });
             }
 
             return productos;
@@ -167,9 +223,9 @@ export class ProductosService {
             const sql = `
                 INSERT INTO productos (
                     codigo_interno, nombre_comercial, principio_activo,
-                    laboratorio_id, categoria_id, requiere_receta, es_controlado, estado
+                    laboratorio_id, categoria_id, requiere_receta, es_controlado, tarifa_iva, estado
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'activo')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'activo')
             `;
 
             const result = await this.db.run(sql, [
@@ -179,7 +235,8 @@ export class ProductosService {
                 producto.laboratorioId || null,
                 producto.categoriaId,
                 producto.requiereReceta ? 1 : 0,
-                producto.esControlado ? 1 : 0
+                producto.esControlado ? 1 : 0,
+                producto.tarifaIva || 0
             ]);
 
             const productoId = result.lastInsertRowid;
@@ -222,7 +279,8 @@ export class ProductosService {
                 UPDATE productos 
                 SET codigo_interno = ?, nombre_comercial = ?, 
                     principio_activo = ?, laboratorio_id = ?, 
-                    categoria_id = ?, requiere_receta = ?, es_controlado = ?
+                    categoria_id = ?, requiere_receta = ?, 
+                    es_controlado = ?, tarifa_iva = ?
                 WHERE id = ?
             `;
 
@@ -234,6 +292,7 @@ export class ProductosService {
                 producto.categoriaId,
                 producto.requiereReceta ? 1 : 0,
                 producto.esControlado ? 1 : 0,
+                producto.tarifaIva || 0,
                 id
             ]);
 
