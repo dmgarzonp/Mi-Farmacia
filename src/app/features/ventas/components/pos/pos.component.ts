@@ -10,12 +10,15 @@ import { InputComponent } from '../../../../shared/components/input/input.compon
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { APP_ICONS } from '../../../../core/constants/icons';
-import { Producto, Lote, Cliente, DetalleVenta, Venta } from '../../../../core/models';
+import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
+import { Producto, Lote, Cliente, DetalleVenta, Venta, Presentacion } from '../../../../core/models';
 
 interface CartItem {
     producto: Producto;
+    presentacion: Presentacion;
     lote: Lote;
-    cantidad: number;
+    cantidad: number; // En unidades de la presentación elegida
+    esFraccion: boolean;
     precioUnitario: number;
     subtotal: number;
 }
@@ -23,7 +26,8 @@ interface CartItem {
 @Component({
     selector: 'app-pos',
     standalone: true,
-    imports: [CommonModule, FormsModule, ReactiveFormsModule, AutocompleteComponent, ButtonComponent, InputComponent, SafeHtmlPipe],
+    imports: [CommonModule, FormsModule, ReactiveFormsModule, AutocompleteComponent, ButtonComponent, InputComponent, SafeHtmlPipe, CurrencyFormatPipe],
+    providers: [CurrencyFormatPipe],
     templateUrl: './pos.component.html',
     styles: [`:host { display: block; height: 100%; }`]
 })
@@ -33,6 +37,7 @@ export class PosComponent implements OnInit {
     private productosService = inject(ProductosService);
     private clientesService = inject(ClientesService);
     private alertService = inject(AlertService);
+    private currencyPipe = inject(CurrencyFormatPipe);
     
     icons = APP_ICONS;
     cart = signal<CartItem[]>([]);
@@ -47,13 +52,34 @@ export class PosComponent implements OnInit {
 
     // Mapeos para Autocomplete
     get productosItems() {
-        return this.productosService.productos()
-            .filter(p => (p.stockTotal || 0) > 0)
-            .map(p => ({
-                id: p.id,
-                label: p.nombreComercial,
-                sublabel: `STOCK: ${p.stockTotal} | S/ ${p.precioVenta.toFixed(2)}`
-            }));
+        const items: any[] = [];
+        this.productosService.productos().forEach(p => {
+            if (p.presentaciones) {
+                p.presentaciones.forEach(pres => {
+                    if ((pres.stockTotal || 0) > 0) {
+                        const stockTotal = pres.stockTotal || 0;
+                        const unidadesPorCaja = pres.unidadesPorCaja || 1;
+                        
+                        let stockLabel = '';
+                        if (unidadesPorCaja > 1) {
+                            const cajas = Math.floor(stockTotal / unidadesPorCaja);
+                            const unidades = stockTotal % unidadesPorCaja;
+                            stockLabel = `STOCK: ${cajas} CAJAS ${unidades > 0 ? '+ ' + unidades + ' ' + pres.unidadBase : ''}`;
+                        } else {
+                            stockLabel = `STOCK: ${stockTotal} ${pres.unidadBase}`;
+                        }
+
+                        items.push({
+                            id: pres.id, // IMPORTANTE: El ID ahora es de la presentación
+                            productId: p.id,
+                            label: `${p.nombreComercial} - ${pres.nombreDescriptivo}`,
+                            sublabel: `${stockLabel} | ${this.currencyPipe.transform(pres.precioVentaCaja)}`
+                        });
+                    }
+                });
+            }
+        });
+        return items;
     }
 
     get clientesItems() {
@@ -74,13 +100,17 @@ export class PosComponent implements OnInit {
     async onProductoSelected(event: any) {
         if (!event || !event.id) return;
 
-        const producto = this.productosService.productos().find(p => p.id === event.id);
-        if (!producto) return;
+        // Buscar el producto y la presentación
+        const producto = this.productosService.productos().find(p => p.id === event.productId);
+        if (!producto || !producto.presentaciones) return;
 
-        // Lógica FEFO: Obtener lotes disponibles ordenados por vencimiento
-        const lotes = await this.ventasService.obtenerLotesDisponibles(producto.id!);
+        const presentacion = producto.presentaciones.find(pres => pres.id === event.id);
+        if (!presentacion) return;
+
+        // Lógica FEFO: Obtener lotes disponibles por presentación
+        const lotes = await this.ventasService.obtenerLotesDisponibles(presentacion.id!);
         if (lotes.length === 0) {
-            this.alertService.error('No hay lotes disponibles para este producto');
+            this.alertService.error('No hay lotes disponibles para esta presentación');
             return;
         }
 
@@ -88,9 +118,10 @@ export class PosComponent implements OnInit {
 
         // Agregar al carrito o aumentar cantidad
         this.cart.update(items => {
-            const existing = items.find(i => i.producto.id === producto.id && i.lote.id === loteSeleccionado.id);
+            const existing = items.find(i => i.presentacion.id === presentacion.id && i.lote.id === loteSeleccionado.id && !i.esFraccion);
             if (existing) {
-                if (existing.cantidad + 1 > loteSeleccionado.stockActual) {
+                const stockNecesario = (existing.cantidad + 1) * (presentacion.unidadesPorCaja || 1);
+                if (stockNecesario > loteSeleccionado.stockActual) {
                     this.alertService.warning('Stock insuficiente en este lote');
                     return items;
                 }
@@ -100,12 +131,34 @@ export class PosComponent implements OnInit {
             } else {
                 return [...items, {
                     producto,
+                    presentacion,
                     lote: loteSeleccionado,
                     cantidad: 1,
-                    precioUnitario: producto.precioVenta,
-                    subtotal: producto.precioVenta
+                    esFraccion: false,
+                    precioUnitario: presentacion.precioVentaCaja,
+                    subtotal: presentacion.precioVentaCaja
                 }];
             }
+        });
+    }
+
+    toggleFraccion(index: number) {
+        this.cart.update(items => {
+            const item = items[index];
+            item.esFraccion = !item.esFraccion;
+            
+            if (item.esFraccion) {
+                // Cambiar a unidades base
+                item.precioUnitario = item.presentacion.precioVentaUnidad;
+                item.cantidad = item.presentacion.unidadesPorCaja;
+            } else {
+                // Cambiar a cajas
+                item.precioUnitario = item.presentacion.precioVentaCaja;
+                item.cantidad = 1;
+            }
+            
+            item.subtotal = item.cantidad * item.precioUnitario;
+            return [...items];
         });
     }
 
@@ -116,14 +169,20 @@ export class PosComponent implements OnInit {
     updateQuantity(index: number, qty: number) {
         this.cart.update(items => {
             const item = items[index];
-            if (qty > item.lote.stockActual) {
-                this.alertService.warning(`Solo hay ${item.lote.stockActual} unidades disponibles`);
-                item.cantidad = item.lote.stockActual;
-            } else if (qty < 1) {
-                item.cantidad = 1;
-            } else {
-                item.cantidad = qty;
+            const unidadesPorCaja = item.presentacion.unidadesPorCaja || 1;
+            const stockActual = item.lote.stockActual;
+            
+            let nuevaCantidad = qty;
+            const totalUnidades = item.esFraccion ? nuevaCantidad : nuevaCantidad * unidadesPorCaja;
+
+            if (totalUnidades > stockActual) {
+                this.alertService.warning(`Stock insuficiente. Disponible: ${stockActual} unidades`);
+                nuevaCantidad = item.esFraccion ? stockActual : Math.floor(stockActual / unidadesPorCaja);
+            } else if (nuevaCantidad < 1) {
+                nuevaCantidad = 1;
             }
+
+            item.cantidad = nuevaCantidad;
             item.subtotal = item.cantidad * item.precioUnitario;
             return [...items];
         });
@@ -142,7 +201,8 @@ export class PosComponent implements OnInit {
                 metodoPago: this.metodoPago(),
                 detalles: this.cart().map(item => ({
                     loteId: item.lote.id!,
-                    cantidad: item.cantidad,
+                    presentacionId: item.presentacion.id!,
+                    cantidad: item.esFraccion ? item.cantidad : item.cantidad * (item.presentacion.unidadesPorCaja || 1),
                     precioUnitario: item.precioUnitario,
                     subtotal: item.subtotal
                 }))

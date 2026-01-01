@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { LaboratoriosService } from '../../services/laboratorios.service';
@@ -17,6 +17,8 @@ import { Laboratorio } from '../../../../core/models';
     templateUrl: './laboratorios-list.component.html'
 })
 export class LaboratoriosListComponent implements OnInit {
+    @Input() isModalMode = false;
+
     laboratoriosService = inject(LaboratoriosService);
     private fb = inject(FormBuilder);
     private alertService = inject(AlertService);

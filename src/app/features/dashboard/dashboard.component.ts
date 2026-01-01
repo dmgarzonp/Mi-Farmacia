@@ -6,6 +6,8 @@ import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
 import { ProductosService } from '../productos/services/productos.service';
 import { ComprasService } from '../compras/services/compras.service';
 
+import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
+
 /**
  * Componente Dashboard - Página principal
  * Centraliza alertas de stock, vencimientos y KPI del sistema
@@ -13,7 +15,7 @@ import { ComprasService } from '../compras/services/compras.service';
 @Component({
     selector: 'app-dashboard',
     standalone: true,
-    imports: [CommonModule, RouterModule, SafeHtmlPipe],
+    imports: [CommonModule, RouterModule, SafeHtmlPipe, CurrencyFormatPipe],
     templateUrl: './dashboard.component.html',
     styles: []
 })
@@ -72,9 +74,10 @@ export class DashboardComponent implements OnInit {
         // 1. Alertas de Vencimiento Reales
         try {
             const lotesVencen = await this.productosService.db.query<any>(`
-                SELECT l.*, p.nombre_comercial 
+                SELECT l.*, p.nombre_comercial, pres.nombre_descriptivo 
                 FROM lotes l 
-                JOIN productos p ON l.producto_id = p.id 
+                JOIN presentaciones pres ON l.presentacion_id = pres.id
+                JOIN productos p ON pres.producto_id = p.id 
                 WHERE l.fecha_vencimiento <= date('now', '+30 days')
                 AND l.stock_actual > 0
                 LIMIT 3
@@ -83,7 +86,7 @@ export class DashboardComponent implements OnInit {
             this.productosService.db.toCamelCase(lotesVencen).forEach((l: any) => {
                 alerts.push({
                     type: 'danger',
-                    message: `Lote ${l.lote} de ${l.nombreComercial} vence el ${l.fechaVencimiento}`,
+                    message: `Lote ${l.lote} de ${l.nombreComercial} (${l.nombreDescriptivo}) vence el ${l.fechaVencimiento}`,
                     date: 'CRÍTICO'
                 });
             });

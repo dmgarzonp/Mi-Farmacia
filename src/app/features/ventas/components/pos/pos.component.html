@@ -27,45 +27,62 @@
         <button (click)="cart.set([])" class="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors">Vaciar Carrito</button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+      <div class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
         <div *ngFor="let item of cart(); let i = index" 
-             class="group flex items-center gap-6 p-5 bg-white border border-gray-100 hover:border-primary-200 hover:shadow-md rounded-3xl transition-all animate-slide-up">
+             class="group flex items-center gap-4 p-3 bg-white border border-gray-100 hover:border-primary-200 hover:shadow-md rounded-2xl transition-all animate-slide-up">
           
-          <div class="w-12 h-12 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center shrink-0">
-            <span class="w-6 h-6" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+          <div class="w-9 h-9 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
+            <span class="w-4 h-4" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
           </div>
 
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-sm font-black text-gray-800 truncate">{{ item.producto.nombreComercial }}</span>
-              <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[8px] font-black rounded uppercase">Lote: {{ item.lote.lote }}</span>
+            <div class="flex items-center gap-2 mb-0.5">
+              <span class="text-xs font-black text-gray-800 truncate">{{ item.producto.nombreComercial }}</span>
+              <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[7px] font-black rounded uppercase">Lote: {{ item.lote.lote }}</span>
+              <!-- Badge de modo de venta -->
+              <span class="px-1.5 py-0.5 bg-primary-100 text-primary-600 text-[7px] font-black rounded uppercase">
+                {{ item.esFraccion ? 'Por Unid.' : 'Por Caja' }}
+              </span>
             </div>
-            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Vence: {{ item.lote.fechaVencimiento }}</p>
+            <p class="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Vence: {{ item.lote.fechaVencimiento }}</p>
           </div>
 
+          <!-- Selector de Fraccionamiento (NUEVO) -->
+          <button 
+            *ngIf="item.presentacion.unidadesPorCaja > 1"
+            (click)="toggleFraccion(i)"
+            class="px-2 py-1 rounded-lg border text-[8px] font-black uppercase transition-all"
+            [ngClass]="{
+              'bg-emerald-500 text-white border-emerald-600 shadow-sm': item.esFraccion,
+              'bg-white text-slate-400 border-slate-200 hover:bg-slate-50': !item.esFraccion
+            }"
+          >
+            {{ item.esFraccion ? 'Venta Unid.' : 'Venta Caja' }}
+          </button>
+
           <!-- Control de Cantidad -->
-          <div class="flex items-center bg-gray-50 rounded-xl p-1 border border-gray-100">
-            <button (click)="updateQuantity(i, item.cantidad - 1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-primary-600 transition-colors">
-              <span class="w-4 h-4" [innerHTML]="icons.CHEVRON_LEFT | safeHtml"></span>
+          <div class="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-100">
+            <button (click)="updateQuantity(i, item.cantidad - 1)" class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-primary-600 transition-colors">
+              <span class="w-3 h-3" [innerHTML]="icons.CHEVRON_LEFT | safeHtml"></span>
             </button>
             <input 
               type="number" 
               [ngModel]="item.cantidad" 
               (ngModelChange)="updateQuantity(i, $event)"
-              class="w-12 bg-transparent text-center text-sm font-black text-gray-800 focus:outline-none"
+              class="w-10 bg-transparent text-center text-xs font-black text-gray-800 focus:outline-none"
             />
-            <button (click)="updateQuantity(i, item.cantidad + 1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-primary-600 transition-colors">
-              <span class="w-4 h-4" [innerHTML]="icons.CHEVRON_RIGHT | safeHtml"></span>
+            <button (click)="updateQuantity(i, item.cantidad + 1)" class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-primary-600 transition-colors">
+              <span class="w-3 h-3" [innerHTML]="icons.CHEVRON_RIGHT | safeHtml"></span>
             </button>
           </div>
 
-          <div class="text-right min-w-[100px]">
-            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Subtotal</p>
-            <span class="text-base font-black text-primary-700">S/ {{ item.subtotal.toFixed(2) }}</span>
+          <div class="text-right min-w-[80px]">
+            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Subtotal</p>
+            <span class="text-sm font-black text-primary-700">{{ item.subtotal | currencyFormat }}</span>
           </div>
 
-          <button (click)="removeItem(i)" class="p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-            <span class="w-5 h-5" [innerHTML]="icons.DELETE | safeHtml"></span>
+          <button (click)="removeItem(i)" class="p-2 text-gray-300 hover:text-red-500 transition-colors">
+            <span class="w-4 h-4 block" [innerHTML]="icons.DELETE | safeHtml"></span>
           </button>
         </div>
 
@@ -81,10 +98,10 @@
     </div>
 
     <!-- Panel Derecho: Checkout -->
-    <div class="w-full lg:w-[400px] flex flex-col gap-6 shrink-0">
+    <div class="w-full lg:w-[360px] flex flex-col gap-4 shrink-0">
       <!-- Selección de Cliente -->
-      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-8 rounded-[2.5rem] shadow-premium">
-        <h3 class="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium">
+        <h3 class="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
           <span class="w-4 h-4 text-primary-500" [innerHTML]="icons.USERS | safeHtml"></span>
           Información del Cliente
         </h3>
@@ -93,66 +110,65 @@
           [(ngModel)]="selectedClienteId"
           placeholder="Buscar cliente..."
         ></app-autocomplete>
-        <p class="text-[9px] text-gray-400 mt-3 italic uppercase text-center font-medium tracking-wider">Opcional para boletas genéricas</p>
+        <p class="text-[8px] text-gray-400 mt-2 italic uppercase text-center font-medium tracking-wider">Opcional para boletas genéricas</p>
       </div>
 
       <!-- Resumen y Pago -->
-      <div class="flex-1 bg-primary-900 text-white p-10 rounded-[3rem] shadow-premium relative overflow-hidden group flex flex-col">
+      <div class="bg-primary-900 text-white p-6 rounded-[2rem] shadow-premium relative overflow-hidden group flex flex-col">
         <div class="absolute -right-10 -top-10 w-48 h-48 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-1000"></div>
         
-        <h3 class="text-[10px] font-black text-primary-400 uppercase tracking-[0.3em] mb-8 relative z-10">Resumen de Venta</h3>
+        <h3 class="text-[9px] font-black text-primary-400 uppercase tracking-[0.3em] mb-4 relative z-10">Resumen de Venta</h3>
 
-        <div class="space-y-4 relative z-10 mb-auto">
-          <div class="flex justify-between items-center text-primary-100/60 text-sm font-medium uppercase tracking-widest">
+        <div class="space-y-3 relative z-10">
+          <div class="flex justify-between items-center text-primary-100/60 text-xs font-medium uppercase tracking-widest">
             <span>Subtotal</span>
-            <span>S/ {{ subtotal().toFixed(2) }}</span>
+            <span>{{ subtotal() | currencyFormat }}</span>
           </div>
-          <div class="flex justify-between items-center text-primary-100/60 text-sm font-medium uppercase tracking-widest">
+          <div class="flex justify-between items-center text-primary-100/60 text-xs font-medium uppercase tracking-widest">
             <span>Impuestos (18%)</span>
-            <span>S/ {{ igv().toFixed(2) }}</span>
+            <span>{{ igv() | currencyFormat }}</span>
           </div>
           
-          <div class="pt-8 border-t border-white/10">
-            <span class="text-[10px] font-black text-primary-400 uppercase tracking-[0.3em]">Total a Pagar</span>
-            <div class="flex items-baseline gap-3 mt-2">
-              <span class="text-2xl font-medium text-primary-300">S/</span>
-              <span class="text-6xl font-black text-white tracking-tighter">{{ total().toFixed(2) }}</span>
+          <div class="pt-4 border-t border-white/10">
+            <span class="text-[9px] font-black text-primary-400 uppercase tracking-[0.3em]">Total a Pagar</span>
+            <div class="flex items-baseline gap-2 mt-1">
+              <span class="text-4xl font-black text-white tracking-tighter">{{ total() | currencyFormat }}</span>
             </div>
           </div>
         </div>
 
-        <div class="mt-10 space-y-6 relative z-10">
+        <div class="mt-8 space-y-4 relative z-10">
           <!-- Métodos de Pago -->
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-3 gap-2">
             <button 
               (click)="metodoPago.set('efectivo')"
               [class.bg-primary-500]="metodoPago() === 'efectivo'"
               [class.text-primary-950]="metodoPago() === 'efectivo'"
-              class="flex flex-col items-center gap-2 p-3 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"
+              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
             >
-              <span class="text-[9px] font-black uppercase tracking-widest">Efectivo</span>
+              <span class="text-[8px] font-black uppercase tracking-widest">Efectivo</span>
             </button>
             <button 
               (click)="metodoPago.set('tarjeta')"
               [class.bg-primary-500]="metodoPago() === 'tarjeta'"
               [class.text-primary-950]="metodoPago() === 'tarjeta'"
-              class="flex flex-col items-center gap-2 p-3 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"
+              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
             >
-              <span class="text-[9px] font-black uppercase tracking-widest">Tarjeta</span>
+              <span class="text-[8px] font-black uppercase tracking-widest">Tarjeta</span>
             </button>
             <button 
               (click)="metodoPago.set('transferencia')"
               [class.bg-primary-500]="metodoPago() === 'transferencia'"
               [class.text-primary-950]="metodoPago() === 'transferencia'"
-              class="flex flex-col items-center gap-2 p-3 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"
+              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
             >
-              <span class="text-[9px] font-black uppercase tracking-widest">Transf.</span>
+              <span class="text-[8px] font-black uppercase tracking-widest">Transf.</span>
             </button>
           </div>
 
           <app-button
             variant="primary"
-            size="lg"
+            size="md"
             [fullWidth]="true"
             [disabled]="cart().length === 0 || guardando()"
             [loading]="guardando()"

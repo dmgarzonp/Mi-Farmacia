@@ -74,13 +74,13 @@ export class AlertComponent {
     constructor(public alertService: AlertService) { }
 
     getAlertClasses(type: AlertType): string {
-        const baseClasses = 'min-w-[320px] max-w-md p-4 rounded-2xl shadow-premium backdrop-blur-md border border-white/20';
+        const baseClasses = 'min-w-[320px] max-w-md p-4 rounded-lg shadow-premium backdrop-blur-md border border-white/20';
 
         const typeClasses = {
             success: 'bg-emerald-50/90 text-emerald-900 border-l-4 border-emerald-500',
             error: 'bg-red-50/90 text-red-900 border-l-4 border-red-500',
             warning: 'bg-amber-50/90 text-amber-900 border-l-4 border-amber-500',
-            info: 'bg-primary-50/90 text-primary-900 border-l-4 border-primary-500',
+            info: 'bg-emerald-50/90 text-emerald-900 border-l-4 border-emerald-500',
         };
 
         return `${baseClasses} ${typeClasses[type]}`;

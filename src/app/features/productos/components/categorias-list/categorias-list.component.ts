@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CategoriasService } from '../../services/categorias.service';
@@ -21,6 +21,8 @@ import { Categoria } from '../../../../core/models';
     templateUrl: './categorias-list.component.html'
 })
 export class CategoriasListComponent implements OnInit {
+    @Input() isModalMode = false;
+
     categoriasService = inject(CategoriasService);
     private fb = inject(FormBuilder);
     private alertService = inject(AlertService);

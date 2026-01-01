@@ -1,200 +1,318 @@
-<div class="max-w-5xl mx-auto space-y-6 pb-12">
-  <!-- Header con Estética Premium -->
-  <div class="flex items-center justify-between animate-fade-in">
-    <div>
-      <h1 class="text-2xl font-black text-gray-900 tracking-tight">{{ isEditMode ? 'Editar' : 'Nuevo' }} Producto</h1>
-      <p class="text-sm text-gray-500 font-medium uppercase tracking-wider mt-1">Gestión del Catálogo Maestro</p>
+<div [class]="isModalMode ? 'w-full' : 'max-w-[1400px] mx-auto pb-8 px-4'">
+  <!-- Header Compacto -->
+  @if (!isModalMode) {
+  <div class="flex items-center justify-between mb-6 animate-fade-in">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-[0.5rem] bg-emerald-600 text-white flex items-center justify-center shadow-lg">
+        <span class="w-6 h-6" [innerHTML]="icons.BOXES | safeHtml"></span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">
+        {{ isEditMode ? 'Editar' : 'Nuevo' }} Producto
+      </h1>
     </div>
-    <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Volver</app-button>
+    <div class="flex items-center gap-3">
+      <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Cancelar</app-button>
+      <app-button type="submit" variant="success" [disabled]="form.invalid || guardando" [loading]="guardando"
+        iconNameLeft="SAVE" (clicked)="guardar()">
+        Guardar Todo
+      </app-button>
+    </div>
   </div>
+  }
 
   <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-slide-up">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      
-      <!-- Columna Principal: Identificación y Clasificación -->
-      <div class="lg:col-span-2 space-y-8">
-        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
-          <h3 class="text-xs font-black text-primary-600 uppercase tracking-[0.2em] mb-8 flex items-center">
-            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full shadow-sm"></span>
-            Identificación del Producto
-          </h3>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="md:col-span-2">
-              <app-input
-                label="Nombre Comercial"
-                formControlName="nombreComercial"
-                placeholder="Ej: Panadol Antigripal"
-                [required]="true"
-                [hasError]="!!(form.get('nombreComercial')?.invalid && form.get('nombreComercial')?.touched)"
-                errorMessage="El nombre es obligatorio"
-              ></app-input>
+      <!-- COLUMNA IZQUIERDA: IDENTIFICACIÓN (3/12) -->
+      <div class="lg:col-span-3 space-y-4">
+        <div class="bg-white border border-slate-200 rounded-[0.5rem] p-6 shadow-sm">
+          <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+            <span class="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
+            1. Identificación
+          </h2>
+
+          <div class="space-y-5">
+            <app-input label="Nombre Comercial" formControlName="nombreComercial" placeholder="Ej: Panadol"
+              [required]="true"></app-input>
+
+            <div class="grid grid-cols-1 gap-4">
+              <div class="relative">
+                <app-input label="SKU" formControlName="codigoInterno"></app-input>
+                <button type="button" (click)="generarSKU(form.get('nombreComercial')?.value || 'PRO')"
+                  class="absolute right-2 top-[30px] p-1 text-slate-300 hover:text-emerald-500" title="Auto-generar">
+                  <span class="w-3 h-3 block" [innerHTML]="icons.BACK | safeHtml"></span>
+                </button>
+              </div>
+              <app-input label="Principio Activo" formControlName="principioActivo"></app-input>
             </div>
 
-            <app-input
-              label="Principio Activo"
-              formControlName="principioActivo"
-              placeholder="Ej: Paracetamol / Pseudoefedrina"
-            ></app-input>
+            <div class="space-y-4">
+              <app-autocomplete label="Laboratorio" placeholder="Seleccionar..." formControlName="laboratorioId"
+                [items]="laboratoriosItems()"></app-autocomplete>
 
-            <app-input
-              label="Presentación"
-              formControlName="presentacion"
-              placeholder="Ej: Caja x 20 tabletas"
-            ></app-input>
+              <app-autocomplete label="Categoría" placeholder="Seleccionar..." formControlName="categoriaId"
+                [items]="categoriasItems()" [required]="true"></app-autocomplete>
+            </div>
 
-            <app-input
-              label="Código de Barras"
-              formControlName="codigoBarras"
-              placeholder="EAN-13"
-              iconName="SEARCH"
-            ></app-input>
-
-            <app-input
-              label="Código Interno (SKU)"
-              formControlName="codigoInterno"
-              placeholder="Ej: MED-001"
-            ></app-input>
-
-            <!-- Selector de Laboratorio -->
-            <div>
-              <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1">Laboratorio (Fabricante)</label>
-              <div class="relative group">
-                <select formControlName="laboratorioId" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none cursor-pointer">
-                  <option value="">Seleccionar Laboratorio...</option>
-                  <option *ngFor="let lab of laboratoriosService.laboratorios()" [value]="lab.id">{{ lab.nombre }}</option>
-                </select>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            <div class="space-y-3 pt-2">
+              <div
+                class="flex items-center justify-between p-3 bg-slate-50 rounded-[0.5rem] border border-slate-100 cursor-pointer"
+                (click)="form.get('requiereReceta')?.setValue(!form.get('requiereReceta')?.value)">
+                <span class="text-[10px] font-black text-slate-500 uppercase">Receta</span>
+                <div class="relative inline-flex items-center">
+                  <input type="checkbox" formControlName="requiereReceta" class="sr-only peer">
+                  <div
+                    class="w-8 h-4 bg-slate-200 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4">
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <!-- Selector de Categoría -->
-            <div>
-              <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1">Categoría</label>
-              <div class="relative group">
-                <select formControlName="categoriaId" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none cursor-pointer">
-                  <option value="">Seleccionar Categoría...</option>
-                  <option *ngFor="let cat of categoriasService.categorias()" [value]="cat.id">{{ cat.nombre }}</option>
-                </select>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              <div
+                class="flex items-center justify-between p-3 bg-slate-50 rounded-[0.5rem] border border-slate-100 cursor-pointer"
+                (click)="form.get('esControlado')?.setValue(!form.get('esControlado')?.value)">
+                <span class="text-[10px] font-black text-red-500 uppercase">Control</span>
+                <div class="relative inline-flex items-center">
+                  <input type="checkbox" formControlName="esControlado" class="sr-only peer">
+                  <div
+                    class="w-8 h-4 bg-slate-200 rounded-full peer peer-checked:bg-red-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4">
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Regulaciones y Alertas -->
-        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
-          <h3 class="text-xs font-black text-primary-600 uppercase tracking-[0.2em] mb-8 flex items-center">
-            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full shadow-sm"></span>
-            Regulaciones y Alertas
-          </h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="space-y-4 p-4 bg-primary-50/50 rounded-2xl border border-primary-100/50">
-              <label class="flex items-center gap-3 cursor-pointer group">
-                <div class="relative">
-                  <input type="checkbox" formControlName="requiereReceta" class="sr-only peer" />
-                  <div class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-primary-500 transition-colors"></div>
-                  <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                </div>
-                <span class="text-sm font-bold text-gray-700 uppercase tracking-tight">Requiere Receta Médica</span>
-              </label>
-              <p class="text-[10px] text-gray-400 ml-13 italic uppercase">El sistema solicitará datos de la receta en la venta</p>
-            </div>
-
-            <div class="space-y-4 p-4 bg-red-50/50 rounded-2xl border border-red-100/50">
-              <label class="flex items-center gap-3 cursor-pointer group">
-                <div class="relative">
-                  <input type="checkbox" formControlName="esControlado" class="sr-only peer" />
-                  <div class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-red-500 transition-colors"></div>
-                  <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                </div>
-                <span class="text-sm font-bold text-gray-700 uppercase tracking-tight">Producto Controlado</span>
-              </label>
-              <p class="text-[10px] text-gray-400 ml-13 italic uppercase">Sujeto a fiscalización especial de stock</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Columna Lateral: Precios y Stock -->
-      <div class="lg:col-span-1 space-y-8">
-        <div class="bg-primary-900 text-white p-8 rounded-3xl shadow-premium relative overflow-hidden group">
-          <!-- Decoración -->
-          <div class="absolute -right-6 -top-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-1000"></div>
+      <!-- COLUMNA DERECHA: PRESENTACIONES EN TABLA (9/12) -->
+      <div class="lg:col-span-9">
+        <div
+          class="bg-white border border-slate-200 rounded-[0.5rem] shadow-sm flex flex-col overflow-hidden min-h-[630px]">
+          <!-- Cabecera de la sección -->
+          <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+            <h2 class="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+              <span class="w-1.5 h-4 bg-emerald-500 rounded-full"></span>
+              2. PRESENTACIONES Y PRECIOS
+            </h2>
+            <app-button variant="primary" size="sm" type="button" (clicked)="agregarPresentacion()" iconNameLeft="ADD">
+              Nueva Fila
+            </app-button>
+          </div>
 
-          <h3 class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em] mb-6 flex items-center relative z-10">
-            Definición de Precios
-          </h3>
+          <!-- Tabla de Presentaciones -->
+          <div class="flex-1 overflow-auto scrollbar-thin">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr
+                  class="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                  <th class="px-4 py-4 font-black">Presentación / Plantilla</th>
+                  <th class="px-2 py-4 text-center">Unidad</th>
+                  <th class="px-2 py-4 text-center">Cant x Caja</th>
+                  <th class="px-2 py-4 text-center text-emerald-600">Costo Caja</th>
+                  <th class="px-2 py-4 text-center text-slate-600">Venta Caja</th>
+                  <th class="px-2 py-4 text-center text-emerald-600">Venta Unid</th>
+                  <th class="px-4 py-4 text-center text-emerald-700">Rentabilidad</th>
+                  <th class="px-2 py-4 text-center text-amber-600">S. Min</th>
+                  <th class="px-4 py-4 text-center">Código de Barras</th>
+                  <th class="px-4 py-4 text-right"></th>
+                </tr>
+              </thead>
+              <tbody formArrayName="presentaciones">
+                @for (pres of presentaciones.controls; track pres; let i = $index) {
+                <tr [formGroupName]="i" class="border-b border-slate-50 group hover:bg-emerald-50/20 transition-colors">
 
-          <div class="space-y-6 relative z-10">
-            <div>
-              <label class="block text-[10px] font-black text-primary-300 uppercase tracking-widest mb-2">Precio de Venta Sugerido (USD)</label>
-              <div class="flex items-center gap-3 bg-white/10 rounded-2xl p-1 border border-white/10">
-                <span class="pl-4 text-xl font-medium text-primary-300">$</span>
-                <input 
-                  type="number" 
-                  formControlName="precioVenta"
-                  class="bg-transparent border-none focus:ring-0 text-3xl font-black text-white w-full placeholder:text-white/20"
-                  placeholder="0.00"
-                  step="0.01"
-                />
+                  <!-- 1. Nombre -->
+                  <td class="px-4 py-4 min-w-[200px] align-middle">
+                    <div class="flex flex-col gap-1.5">
+                      <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full" [class.bg-emerald-500]="i === 0"
+                          [class.bg-slate-300]="i !== 0"></span>
+                        <input type="text" formControlName="nombreDescriptivo"
+                          [ngClass]="pres.get('nombreDescriptivo')?.value ? 'bg-emerald-50/30 border-emerald-100 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-700'"
+                          placeholder="Ej: Caja x 100"
+                          class="w-full px-3 py-2 border-2 rounded-[0.5rem] text-[11px] font-bold text-center focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all" />
+                      </div>
+                      <div class="flex gap-1 ml-3.5">
+                        <button type="button" (click)="aplicarPlantilla(i, 'caja100')"
+                          class="px-1.5 py-0.5 bg-white border border-slate-200 text-[7px] font-black rounded-[0.5rem] hover:bg-emerald-500 hover:text-white transition-all uppercase">C100</button>
+                        <button type="button" (click)="aplicarPlantilla(i, 'caja30')"
+                          class="px-1.5 py-0.5 bg-white border border-slate-200 text-[7px] font-black rounded-[0.5rem] hover:bg-emerald-500 hover:text-white transition-all uppercase">C30</button>
+                        <button type="button" (click)="aplicarPlantilla(i, 'frasco')"
+                          class="px-1.5 py-0.5 bg-white border border-slate-200 text-[7px] font-black rounded-[0.5rem] hover:bg-emerald-500 hover:text-white transition-all uppercase">FRAS</button>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 2. Unidad -->
+                  <td class="px-2 py-4 w-20 align-middle">
+                    <div class="flex flex-col items-center">
+                      <input type="text" formControlName="unidadBase"
+                        class="w-full bg-slate-50 border border-slate-100 rounded-[0.5rem] py-2 text-[11px] font-bold text-center focus:ring-1 focus:ring-emerald-500/20" />
+                      <div class="h-4"></div>
+                    </div>
+                  </td>
+
+                  <!-- 3. Cant x Caja -->
+                  <td class="px-2 py-4 w-20 align-middle">
+                    <div class="flex flex-col items-center">
+                      <input type="number" formControlName="unidadesPorCaja"
+                        class="w-full bg-slate-50 border border-slate-100 rounded-[0.5rem] py-2 text-[11px] font-black text-center focus:ring-1 focus:ring-emerald-500/20" />
+                      <div class="h-4"></div>
+                    </div>
+                  </td>
+
+                  <!-- 4. Costo Caja -->
+                  <td class="px-2 py-4 w-28 align-middle">
+                    <div class="flex flex-col items-center">
+                      <div class="relative w-full">
+                        <span
+                          class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-emerald-400 font-bold">$</span>
+                        <input type="number" formControlName="precioCompraCaja"
+                          class="w-full pl-4 pr-1 bg-emerald-50/30 border border-emerald-100 rounded-[0.5rem] py-2 text-[11px] font-black text-emerald-700 text-center focus:ring-1 focus:ring-emerald-500/20" />
+                      </div>
+                      <p class="text-[7px] font-bold text-emerald-500 mt-1 text-center uppercase">u: {{
+                        getCostoPorUnidad(i) | currency }}</p>
+                    </div>
+                  </td>
+
+                  <!-- 5. Venta Caja -->
+                  <td class="px-2 py-4 w-28 align-middle">
+                    <div class="flex flex-col items-center">
+                      <div class="relative w-full">
+                        <span
+                          class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold">$</span>
+                        <input type="number" formControlName="precioVentaCaja"
+                          class="w-full pl-4 pr-1 bg-slate-50 border border-slate-100 rounded-[0.5rem] py-2 text-[11px] font-black text-slate-700 text-center focus:ring-1 focus:ring-emerald-500/20" />
+                      </div>
+                      <div class="h-4"></div>
+                    </div>
+                  </td>
+
+                  <!-- 6. Venta Unidad -->
+                  <td class="px-2 py-4 w-32 align-middle">
+                    <div class="flex flex-col items-center">
+                      <div class="relative w-full">
+                        <span
+                          class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-emerald-400 font-bold">$</span>
+                        <input type="number" formControlName="precioVentaUnidad"
+                          [ngClass]="pres.get('precioVentaUnidadManual')?.value ? 'bg-amber-50/30 border-amber-100 text-amber-700' : 'bg-emerald-50/30 border-emerald-100 text-emerald-700'"
+                          class="w-full pl-4 pr-6 bg-emerald-50/30 border border-emerald-100 rounded-[0.5rem] py-2 text-[11px] font-black text-center focus:ring-1 focus:ring-emerald-500/20" />
+                        @if (pres.get('precioVentaUnidadManual')?.value) {
+                        <button (click)="resetPrecioSugerido(i)" type="button"
+                          class="absolute right-1 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500">
+                          <span class="w-3 h-3 block" [innerHTML]="icons.BACK | safeHtml"></span>
+                        </button>
+                        }
+                      </div>
+                      <div class="flex justify-center mt-1">
+                        <span
+                          class="text-[7px] px-1 py-0.5 rounded-full bg-white border border-slate-100 text-slate-400 font-black uppercase">
+                          {{ pres.get('precioVentaUnidadManual')?.value ? 'Manual' : 'Sugerido' }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 7. Rentabilidad (UBICACIÓN PROTAGONISTA) -->
+                  <td class="px-4 py-4 min-w-[140px] align-middle">
+                    <div class="flex flex-col items-center gap-1">
+                      <div [ngClass]="getMargenPorUnidad(i) >= 0 ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'"
+                           class="px-3 py-1.5 rounded-lg border flex flex-col items-center shadow-sm w-full">
+                        <span class="text-[9px] font-black uppercase tracking-tighter leading-none mb-1">Margen Unidad</span>
+                        <span class="text-xs font-black">{{ getMargenPorUnidad(i) | currency }}</span>
+                        <span class="text-[9px] font-bold opacity-80">({{ (getMargenPorUnidad(i) / (getCostoPorUnidad(i) || 1) * 100).toFixed(1) }}%)</span>
+                      </div>
+                      
+                      <!-- Alertas de Error Críticas -->
+                      <div class="flex flex-col gap-1 w-full">
+                        @if (pres.hasError('precioVentaBajo')) {
+                          <div class="flex items-center justify-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md animate-pulse" title="¡VENTA POR DEBAJO DEL COSTO!">
+                            <span class="w-2.5 h-2.5 block" [innerHTML]="icons.ERROR | safeHtml"></span>
+                            <span class="text-[7px] font-black uppercase">BAJO COSTO</span>
+                          </div>
+                        }
+                        @if (pres.hasError('unidadMasCaraQueCaja')) {
+                          <div class="flex items-center justify-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200" title="La unidad sale más cara que la caja">
+                            <span class="w-2.5 h-2.5 block" [innerHTML]="icons.ALERT | safeHtml"></span>
+                            <span class="text-[7px] font-black uppercase">INCONSISTENTE</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 8. Stock Min -->
+                  <td class="px-2 py-4 w-20 align-middle">
+                    <div class="flex flex-col items-center">
+                      <input type="number" formControlName="stockMinimo"
+                        class="w-full bg-amber-50/30 border border-amber-100 rounded-[0.5rem] py-2 text-[11px] font-black text-amber-700 text-center focus:ring-1 focus:ring-emerald-500/20" />
+                      <div class="h-4"></div>
+                    </div>
+                  </td>
+
+                  <!-- 9. Código de Barras -->
+                  <td class="px-2 py-4 min-w-[150px] align-middle">
+                    <div class="flex items-center gap-1 px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg group-focus-within:border-emerald-500 transition-all">
+                       <span class="w-3 h-3 text-slate-300" [innerHTML]="icons.SEARCH | safeHtml"></span>
+                       <input type="text" formControlName="codigoBarras" placeholder="Escanear..." class="w-full bg-transparent border-none p-0 text-[10px] font-mono text-slate-500 focus:ring-0" />
+                    </div>
+                  </td>
+
+                  <!-- 10. Acciones -->
+                  <td class="px-4 py-4 text-right align-middle">
+                    <div class="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button type="button" (click)="copiarPresentacion(i)"
+                        class="p-1.5 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-[0.5rem] shadow-sm"
+                        title="Duplicar">
+                        <span class="w-3.5 h-3.5 block" [innerHTML]="icons.EDIT | safeHtml"></span>
+                      </button>
+                      @if (i > 0) {
+                      <button type="button" (click)="removerPresentacion(i)"
+                        class="p-1.5 text-slate-400 hover:text-red-500 bg-white border border-slate-100 rounded-[0.5rem] shadow-sm"
+                        title="Eliminar">
+                        <span class="w-3.5 h-3.5 block" [innerHTML]="icons.DELETE | safeHtml"></span>
+                      </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+                } @empty {
+                <tr>
+                  <td colspan="10" class="py-12 text-center">
+                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest">No hay filas. Haz clic en
+                      "Nueva Fila".</p>
+                  </td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer de la Tabla -->
+          <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div class="flex gap-6 text-slate-400">
+              <div class="flex items-center gap-1.5">
+                <kbd class="px-1.5 py-0.5 bg-white rounded border border-slate-200 text-[9px] font-black">CTRL + S</kbd>
+                <span class="text-[9px] font-bold uppercase tracking-widest">Guardar</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <kbd class="px-1.5 py-0.5 bg-white rounded border border-slate-200 text-[9px] font-black">ESC</kbd>
+                <span class="text-[9px] font-bold uppercase tracking-widest">Cerrar</span>
               </div>
             </div>
-
-            <app-input
-              label="Stock Mínimo (Alerta)"
-              type="number"
-              formControlName="stockMinimo"
-              placeholder="0"
-              class="dark-input"
-            ></app-input>
-
-            <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
-              <p class="text-[10px] text-primary-300 font-medium uppercase tracking-wider leading-relaxed">
-                * El stock actual no se edita aquí. Se actualiza automáticamente al recibir lotes de compra o ajustes.
-              </p>
-            </div>
+            <p class="text-[10px] text-emerald-500 font-black uppercase tracking-widest">
+              {{ presentaciones.length }} Fila(s) configurada(s)
+            </p>
           </div>
         </div>
-
-        <div class="space-y-3">
-          <app-button 
-            type="submit" 
-            variant="primary" 
-            [fullWidth]="true"
-            [disabled]="form.invalid || guardando"
-            iconNameLeft="SAVE"
-            size="lg"
-          >
-            {{ guardando ? 'Guardando...' : (isEditMode ? 'Actualizar Catálogo' : 'Guardar en Catálogo') }}
-          </app-button>
-          
-          <app-button 
-            type="button" 
-            variant="secondary" 
-            [fullWidth]="true" 
-            (clicked)="volver()"
-            iconNameLeft="CANCEL"
-          >
-            Cancelar
-          </app-button>
-        </div>
       </div>
+
     </div>
   </form>
 </div>
 
 <style>
-  .ml-13 { margin-left: 3.25rem; }
-  ::ng-deep .dark-input label { color: #a7f3d0 !important; }
-  ::ng-deep .dark-input input { 
-    background-color: rgba(255,255,255,0.05) !important; 
-    border-color: rgba(255,255,255,0.1) !important;
-    color: white !important;
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 </style>

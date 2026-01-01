@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter, signal, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { APP_ICONS } from '../../../core/constants/icons';
@@ -42,7 +42,7 @@ export interface TableAction<T = any> {
     templateUrl: './table.component.html',
     styles: []
 })
-export class TableComponent<T = any> {
+export class TableComponent<T = any> implements OnChanges {
     @Input() columns: TableColumn<T>[] = [];
     @Input() data: T[] = [];
     @Input() actions?: TableAction<T>[];
@@ -74,11 +74,16 @@ export class TableComponent<T = any> {
         this.updatePaginatedData();
     }
 
-    ngOnChanges() {
-        this.onSearch();
+    ngOnChanges(changes: SimpleChanges) {
+        // Solo reiniciamos a la página 1 si el término de búsqueda cambió realmente
+        if (changes['searchTerm']) {
+            this.onSearch(true);
+        } else if (changes['data']) {
+            this.onSearch(false);
+        }
     }
 
-    onSearch(): void {
+    onSearch(resetPage = true): void {
         this.searchTermChange.emit(this.searchTerm);
         if (!this.searchTerm) {
             this.filteredData.set(this.data);
@@ -92,7 +97,17 @@ export class TableComponent<T = any> {
             );
             this.filteredData.set(filtered);
         }
-        this.currentPage.set(1);
+        
+        if (resetPage) {
+            this.currentPage.set(1);
+        } else {
+            // Validar que la página actual siga siendo válida tras el cambio de datos
+            const total = this.totalPages();
+            if (this.currentPage() > total && total > 0) {
+                this.currentPage.set(total);
+            }
+        }
+        
         this.updatePaginatedData();
     }
 

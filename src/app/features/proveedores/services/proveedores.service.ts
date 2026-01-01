@@ -16,18 +16,22 @@ export class ProveedoresService {
 
     constructor(private db: DatabaseService) { }
 
-    async cargarProveedores(): Promise<void> {
+    async cargarProveedores(estado?: EstadoRegistro): Promise<void> {
         this.loading.set(true);
         this.error.set(null);
 
         try {
-            const sql = `
-                SELECT * FROM proveedores 
-                WHERE estado = 'activo' 
-                ORDER BY nombre_empresa ASC
-            `;
+            let sql = `SELECT * FROM proveedores`;
+            const params: any[] = [];
 
-            const result = await this.db.query<any>(sql);
+            if (estado) {
+                sql += ` WHERE estado = ?`;
+                params.push(estado);
+            }
+
+            sql += ` ORDER BY nombre_empresa ASC`;
+
+            const result = await this.db.query<any>(sql, params);
             const proveedores = this.db.toCamelCase(result) as Proveedor[];
             this.proveedores.set(proveedores);
         } catch (err: any) {
@@ -40,7 +44,7 @@ export class ProveedoresService {
 
     async obtenerPorId(id: number): Promise<Proveedor | null> {
         try {
-            const sql = `SELECT * FROM proveedores WHERE id = ? AND estado = 'activo'`;
+            const sql = `SELECT * FROM proveedores WHERE id = ?`;
             const proveedor = await this.db.get<any>(sql, [id]);
 
             if (!proveedor) return null;
@@ -51,14 +55,17 @@ export class ProveedoresService {
         }
     }
 
-    async buscar(termino: string): Promise<Proveedor[]> {
+    async buscar(termino: string, soloActivos: boolean = true): Promise<Proveedor[]> {
         try {
-            const sql = `
+            let sql = `
                 SELECT * FROM proveedores 
-                WHERE estado = 'activo' 
-                AND (nombre_empresa LIKE ? OR ruc LIKE ? OR nombre_contacto LIKE ?)
-                ORDER BY nombre_empresa ASC
+                WHERE (nombre_empresa LIKE ? OR ruc LIKE ? OR nombre_contacto LIKE ?)
             `;
+            if (soloActivos) {
+                sql += ` AND estado = 'activo'`;
+            }
+            sql += ` ORDER BY nombre_empresa ASC`;
+
             const searchTerm = `%${termino}%`;
             const result = await this.db.query<any>(sql, [searchTerm, searchTerm, searchTerm]);
             return this.db.toCamelCase(result) as Proveedor[];
@@ -92,7 +99,7 @@ export class ProveedoresService {
     async actualizar(id: number, proveedor: Partial<Proveedor>): Promise<void> {
         try {
             const dbData = this.db.toSnakeCase(proveedor);
-            delete dbData.id; // No actualizar el ID
+            delete dbData.id;
             
             const keys = Object.keys(dbData);
             const values = Object.values(dbData);
@@ -112,14 +119,19 @@ export class ProveedoresService {
         }
     }
 
-    async eliminar(id: number): Promise<void> {
+    async cambiarEstado(id: number, estado: EstadoRegistro): Promise<void> {
         try {
-            const sql = `UPDATE proveedores SET estado = 'inactivo' WHERE id = ?`;
-            await this.db.run(sql, [id]);
+            const sql = `UPDATE proveedores SET estado = ? WHERE id = ?`;
+            await this.db.run(sql, [estado, id]);
             await this.cargarProveedores();
         } catch (err: any) {
-            console.error('Error eliminando proveedor:', err);
+            console.error('Error cambiando estado del proveedor:', err);
             throw err;
         }
+    }
+
+    async eliminar(id: number): Promise<void> {
+        // Mantenemos el nombre 'eliminar' por compatibilidad, pero realiza un borrado lógico
+        return this.cambiarEstado(id, EstadoRegistro.INACTIVO);
     }
 }

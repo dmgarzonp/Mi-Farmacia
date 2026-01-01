@@ -9,6 +9,7 @@ declare global {
             dbQuery: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
             dbRun: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
             dbGet: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+            getLocale: () => Promise<string>;
         };
     }
 }
@@ -21,6 +22,18 @@ declare global {
     providedIn: 'root'
 })
 export class DatabaseService {
+
+    /**
+     * Obtiene el locale del sistema desde Electron
+     */
+    async getLocale(): Promise<string> {
+        try {
+            return await window.electronAPI.getLocale();
+        } catch (error) {
+            console.error('Error getting locale:', error);
+            return navigator.language || 'es-PE';
+        }
+    }
 
     /**
      * Ejecuta una consulta SELECT que retorna múltiples filas

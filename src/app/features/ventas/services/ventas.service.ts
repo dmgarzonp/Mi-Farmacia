@@ -33,16 +33,16 @@ export class VentasService {
     }
 
     /**
-     * Busca lotes disponibles para un producto usando lógica FEFO
+     * Busca lotes disponibles para una presentación específica usando lógica FEFO
      */
-    async obtenerLotesDisponibles(productoId: number): Promise<Lote[]> {
+    async obtenerLotesDisponibles(presentacionId: number): Promise<Lote[]> {
         const sql = `
             SELECT * FROM lotes 
-            WHERE producto_id = ? AND stock_actual > 0 
+            WHERE presentacion_id = ? AND stock_actual > 0 
             AND fecha_vencimiento >= date('now')
             ORDER BY fecha_vencimiento ASC
         `;
-        const result = await this.db.query<any>(sql, [productoId]);
+        const result = await this.db.query<any>(sql, [presentacionId]);
         return this.db.toCamelCase(result);
     }
 
@@ -74,12 +74,13 @@ export class VentasService {
             if (venta.detalles) {
                 for (const det of venta.detalles) {
                     const sqlDet = `
-                        INSERT INTO ventas_detalles (venta_id, lote_id, cantidad, precio_unitario, subtotal)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO ventas_detalles (venta_id, lote_id, presentacion_id, cantidad, precio_unitario, subtotal)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     `;
                     await this.db.run(sqlDet, [
                         ventaId,
                         det.loteId,
+                        det.presentacionId || null,
                         det.cantidad,
                         det.precioUnitario,
                         det.subtotal
@@ -111,5 +112,11 @@ export class VentasService {
         }
     }
 }
+
+
+
+
+
+
 
 

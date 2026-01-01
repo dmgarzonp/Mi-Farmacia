@@ -17,7 +17,21 @@
 
   <!-- KPI Cards -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
-    <!-- Card 1: Pendientes -->
+    <!-- Card 1: Borradores -->
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
+          <span class="w-6 h-6 block" [innerHTML]="icons.EDIT | safeHtml"></span>
+        </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Borradores</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().borradores }}</p>
+        </div>
+      </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-slate-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+    </div>
+
+    <!-- Card 2: Pendientes -->
     <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
       <div class="flex items-center gap-4 relative z-10">
         <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
@@ -31,7 +45,7 @@
       <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
-    <!-- Card 2: Recibidas -->
+    <!-- Card 3: Recibidas -->
     <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
       <div class="flex items-center gap-4 relative z-10">
         <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
@@ -45,21 +59,18 @@
       <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
-    <!-- Card 3: Inversión Total (USD) -->
-    <div class="bg-primary-900 p-6 rounded-3xl shadow-lg relative overflow-hidden group md:col-span-2">
-      <div class="absolute -right-4 -top-4 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
-      <div class="flex items-center gap-6 relative z-10">
-        <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-primary-300">
-          <span class="w-8 h-8 block" [innerHTML]="icons.CART | safeHtml"></span>
+    <!-- Card 4: Inversión Total -->
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-500 group-hover:scale-110 transition-transform">
+          <span class="w-6 h-6 block" [innerHTML]="icons.CART | safeHtml"></span>
         </div>
         <div>
-          <p class="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em] mb-1">Inversión Total en Compras</p>
-          <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-black text-white">$ {{ stats().inversionTotal.toFixed(2) }}</span>
-            <span class="text-xs font-bold text-primary-300 uppercase">USD</span>
-          </div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inversión Total</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().inversionTotal | currencyFormat }}</p>
         </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
   </div>
 
@@ -87,36 +98,34 @@
     </div>
   </div>
 
-  <!-- Tabla o Skeletons -->
+  <!-- Tabla -->
   <div class="animate-slide-up" style="animation-delay: 200ms">
-    @if (comprasService.loading()) {
-      <div class="bg-white rounded-3xl border border-gray-100 p-8 space-y-6">
-        <div class="flex gap-4">
-          <app-skeleton width="120px" height="2rem"></app-skeleton>
-          <app-skeleton width="180px" height="2rem"></app-skeleton>
-        </div>
-        <div class="space-y-4">
-          @for (i of [1,2,3,4,5]; track i) {
-            <div class="flex items-center gap-4 border-b border-gray-50 pb-4">
-              <app-skeleton width="60px" height="1.5rem"></app-skeleton>
-              <div class="flex-1">
-                <app-skeleton width="40%" height="1rem"></app-skeleton>
-              </div>
-              <app-skeleton width="100px" height="1.5rem"></app-skeleton>
-              <app-skeleton width="120px" height="2rem"></app-skeleton>
-            </div>
-          }
-        </div>
-      </div>
-    } @else {
-      <app-table
-        [columns]="columns"
-        [data]="comprasService.ordenes() | filter:searchTerm"
-        [actions]="actions"
-        emptyCtaLabel="Crear Nueva Orden"
-        emptyCtaIcon="ADD"
-        (emptyCtaClicked)="crearNueva()"
-      ></app-table>
-    }
+    <app-table
+      [columns]="columns"
+      [data]="comprasService.ordenes() | filter:searchTerm"
+      [loading]="comprasService.loading()"
+      [searchTerm]="searchTerm"
+      [actions]="actions"
+      emptyCtaLabel="Crear Nueva Orden"
+      emptyCtaIcon="ADD"
+      (emptyCtaClicked)="crearNueva()"
+    ></app-table>
   </div>
+
+  <!-- Modal de Recepción de Mercancía -->
+  <app-modal
+    [isOpen]="showModalRecepcion()"
+    [title]="'Recepción de Orden #' + selectedOrden()?.id"
+    size="lg"
+    (closed)="showModalRecepcion.set(false)"
+  >
+    @if (selectedOrden()) {
+      <app-recepcion-form
+        [orden]="selectedOrden()!"
+        [loading]="procesandoRecepcion()"
+        (saved)="confirmarRecepcion($event)"
+        (cancel)="showModalRecepcion.set(false)"
+      ></app-recepcion-form>
+    }
+  </app-modal>
 </div>

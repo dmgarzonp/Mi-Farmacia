@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const Database = require('better-sqlite3');
+const initialData = require('./database/initial-data');
 
 let mainWindow;
 let db;
@@ -14,6 +15,7 @@ function initDatabase() {
 
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON'); // Activar soporte de llaves foráneas
 
     // Crear tablas si no existen
     createTables();
@@ -69,18 +71,14 @@ function createTables() {
       estado TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo'))
     );
 
-    -- === PRODUCTOS (catálogo maestro) ===
+    -- === PRODUCTOS (catálogo maestro genérico) ===
     CREATE TABLE IF NOT EXISTS productos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      codigo_barras TEXT UNIQUE,
       codigo_interno TEXT UNIQUE,
       nombre_comercial TEXT NOT NULL,
       principio_activo TEXT,
-      presentacion TEXT,
       laboratorio_id INTEGER,
       categoria_id INTEGER,
-      precio_venta REAL DEFAULT 0,
-      stock_minimo INTEGER DEFAULT 0,
       requiere_receta BOOLEAN DEFAULT 0,
       es_controlado BOOLEAN DEFAULT 0,
       estado TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo')),
@@ -88,17 +86,34 @@ function createTables() {
       FOREIGN KEY(categoria_id) REFERENCES categorias(id)
     );
 
-    -- === LOTES (inventario real con trazabilidad) ===
-    CREATE TABLE IF NOT EXISTS lotes (
+    -- === PRESENTACIONES (cómo se empaqueta y vende) ===
+    CREATE TABLE IF NOT EXISTS presentaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       producto_id INTEGER NOT NULL,
+      nombre_descriptivo TEXT NOT NULL, -- Ej: "Caja x 100 tabletas"
+      unidad_base TEXT NOT NULL,        -- Ej: "tableta"
+      unidades_por_caja INTEGER NOT NULL DEFAULT 1,
+      precio_compra_caja REAL DEFAULT 0,
+      precio_venta_unidad REAL DEFAULT 0,
+      precio_venta_caja REAL DEFAULT 0,
+      stock_minimo INTEGER DEFAULT 0,
+      codigo_barras TEXT UNIQUE,
+      vencimiento_predeterminado_meses INTEGER DEFAULT 0,
+      FOREIGN KEY(producto_id) REFERENCES productos(id) ON DELETE CASCADE
+    );
+
+    -- === LOTES (inventario real con trazabilidad por presentación) ===
+    CREATE TABLE IF NOT EXISTS lotes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      presentacion_id INTEGER NOT NULL,
       lote TEXT NOT NULL,
       fecha_vencimiento DATE NOT NULL,
-      stock_actual INTEGER DEFAULT 0 CHECK(stock_actual >= 0),
+      stock_actual INTEGER DEFAULT 0 CHECK(stock_actual >= 0), -- En unidades base
+      precio_compra_caja REAL DEFAULT 0,
+      precio_compra_unitario REAL DEFAULT 0, -- Calculado (compra_caja / unid_por_caja)
       ubicacion TEXT,
       fecha_ingreso DATE DEFAULT CURRENT_DATE,
-      UNIQUE(producto_id, lote),
-      FOREIGN KEY(producto_id) REFERENCES productos(id) ON DELETE CASCADE
+      FOREIGN KEY(presentacion_id) REFERENCES presentaciones(id) ON DELETE CASCADE
     );
 
     -- === COMPRAS ===
@@ -107,7 +122,7 @@ function createTables() {
       proveedor_id INTEGER NOT NULL,
       fecha_emision DATE NOT NULL DEFAULT CURRENT_DATE,
       fecha_requerida DATE,
-      estado TEXT DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'aprobada', 'recibida', 'cancelada')),
+      estado TEXT DEFAULT 'borrador' CHECK(estado IN ('borrador', 'pendiente', 'aprobada', 'recibida', 'cancelada')),
       subtotal REAL NOT NULL CHECK(subtotal >= 0),
       descuento_monto REAL DEFAULT 0 CHECK(descuento_monto >= 0),
       impuesto_total REAL DEFAULT 0 CHECK(impuesto_total >= 0),
@@ -126,14 +141,14 @@ function createTables() {
     CREATE TABLE IF NOT EXISTS ordenes_compra_detalles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       orden_compra_id INTEGER NOT NULL,
-      producto_id INTEGER NOT NULL,
-      cantidad REAL NOT NULL CHECK(cantidad > 0),
-      precio_unitario REAL NOT NULL CHECK(precio_unitario >= 0),
+      presentacion_id INTEGER NOT NULL,
+      cantidad REAL NOT NULL CHECK(cantidad > 0), -- Cantidad en CAJAS
+      precio_unitario REAL NOT NULL CHECK(precio_unitario >= 0), -- Precio por CAJA
       subtotal REAL NOT NULL CHECK(subtotal >= 0),
-      lote TEXT NOT NULL,
-      fecha_vencimiento DATE NOT NULL,
+      lote TEXT,
+      fecha_vencimiento DATE,
       FOREIGN KEY(orden_compra_id) REFERENCES ordenes_compra(id) ON DELETE CASCADE,
-      FOREIGN KEY(producto_id) REFERENCES productos(id)
+      FOREIGN KEY(presentacion_id) REFERENCES presentaciones(id)
     );
 
     -- === VENTAS ===
@@ -155,11 +170,13 @@ function createTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       venta_id INTEGER NOT NULL,
       lote_id INTEGER NOT NULL,
+      presentacion_id INTEGER, -- Añadido para trazabilidad directa
       cantidad REAL NOT NULL CHECK(cantidad > 0),
       precio_unitario REAL NOT NULL CHECK(precio_unitario >= 0),
       subtotal REAL NOT NULL CHECK(subtotal >= 0),
       FOREIGN KEY(venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
-      FOREIGN KEY(lote_id) REFERENCES lotes(id)
+      FOREIGN KEY(lote_id) REFERENCES lotes(id),
+      FOREIGN KEY(presentacion_id) REFERENCES presentaciones(id)
     );
 
     -- === RECETAS ===
@@ -191,85 +208,138 @@ function createTables() {
 
     -- === ÍNDICES PARA RENDIMIENTO ===
     CREATE INDEX IF NOT EXISTS idx_lotes_vencimiento ON lotes(fecha_vencimiento);
-    CREATE INDEX IF NOT EXISTS idx_lotes_producto ON lotes(producto_id);
+    CREATE INDEX IF NOT EXISTS idx_lotes_presentacion ON lotes(presentacion_id);
     CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha_venta);
     CREATE INDEX IF NOT EXISTS idx_compras_proveedor ON ordenes_compra(proveedor_id);
     CREATE INDEX IF NOT EXISTS idx_movimientos_lote ON movimientos_stock(lote_id);
-    CREATE INDEX IF NOT EXISTS idx_productos_codigo_barras ON productos(codigo_barras);
+    CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(nombre_comercial);
     CREATE INDEX IF NOT EXISTS idx_productos_laboratorio ON productos(laboratorio_id);
   `;
 
+    // Verificación de esquema previo (Migración destructiva para desarrollo)
+    try {
+        const tableInfo = db.prepare("PRAGMA table_info(presentaciones)").all();
+        const hasPrecioCompra = tableInfo.some(col => col.name === 'precio_compra_caja');
+        const isOldLotes = db.prepare("PRAGMA table_info(lotes)").all().some(col => col.name === 'producto_id');
+        
+        if (isOldLotes || !hasPrecioCompra) {
+            console.log('Old schema detected. Resetting tables for new Product-Presentation-Lote architecture...');
+            db.exec('PRAGMA foreign_keys = OFF;');
+            db.exec('DROP TABLE IF EXISTS lotes;');
+            db.exec('DROP TABLE IF EXISTS presentaciones;');
+            db.exec('DROP TABLE IF EXISTS productos;');
+            db.exec('DROP TABLE IF EXISTS ordenes_compra_detalles;');
+            db.exec('DROP TABLE IF EXISTS ventas_detalles;');
+            db.exec('DROP TABLE IF EXISTS movimientos_stock;');
+            db.exec('PRAGMA foreign_keys = ON;');
+        }
+    } catch (e) {
+        console.error('Error checking schema:', e);
+    }
+
     db.exec(schema);
     console.log('Database tables created/checked successfully');
-
-    // MIGRACIONES: Asegurar que columnas nuevas existan en tablas viejas
-    ensureColumns();
 
     // Insertar datos iniciales
     seedInitialData();
 }
 
 /**
- * Asegura que las columnas críticas existan (Migraciones básicas)
+ * Inserta datos iniciales para pruebas usando transacciones
  */
-function ensureColumns() {
-    const migrations = [
-        { table: 'proveedores', column: 'estado', type: "TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo'))" },
-        { table: 'productos', column: 'laboratorio_id', type: 'INTEGER' },
-        { table: 'productos', column: 'precio_venta', type: 'REAL DEFAULT 0' },
-        { table: 'productos', column: 'stock_minimo', type: 'INTEGER DEFAULT 0' },
-        { table: 'productos', column: 'codigo_interno', type: 'TEXT UNIQUE' },
-        { table: 'usuarios', column: 'estado', type: "TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo'))" },
-        { table: 'ordenes_compra', column: 'moneda', type: "TEXT DEFAULT 'USD'" }
-    ];
-
-    migrations.forEach(m => {
-        try {
-            const columns = db.prepare(`PRAGMA table_info(${m.table})`).all();
-            const exists = columns.some(c => c.name === m.column);
-            
-            if (!exists) {
-                console.log(`Migrating: Adding column ${m.column} to ${m.table}`);
-                db.prepare(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.type}`).run();
-            }
-        } catch (e) {
-            console.error(`Error migrating ${m.table}.${m.column}:`, e.message);
-        }
-    });
-}
 
 /**
- * Inserta datos iniciales para pruebas
+ * Inserta datos iniciales para pruebas usando transacciones
  */
 function seedInitialData() {
     const count = db.prepare('SELECT COUNT(*) as count FROM categorias').get();
 
     if (count.count === 0) {
-        console.log('Seeding initial data...');
+        console.log('Seeding initial data using transactions...');
 
-        // Categorías
+        // 1. Inserción de Categorías
         const insertCategoria = db.prepare('INSERT INTO categorias (nombre) VALUES (?)');
-        const categorias = ['Analgésicos', 'Antibióticos', 'Antiinflamatorios', 'Vitaminas', 'Dermatológicos', 'Respiratorios'];
-        categorias.forEach(nombre => insertCategoria.run(nombre));
+        const seedCategorias = db.transaction((categorias) => {
+            for (const nombre of categorias) insertCategoria.run(nombre);
+        });
+        seedCategorias(initialData.CATEGORIAS);
 
-        // Laboratorios (Nuevos datos iniciales para Ecuador)
+        // 2. Inserción de Laboratorios
         const insertLab = db.prepare('INSERT INTO laboratorios (nombre, pais) VALUES (?, ?)');
-        const labs = [
-            ['GENFAR', 'Colombia'],
-            ['PHARMABRAND', 'Ecuador'],
-            ['GRUPO DIFARE', 'Ecuador'],
-            ['BAYER', 'Alemania'],
-            ['PFIZER', 'USA'],
-            ['BAGÓ', 'Argentina']
-        ];
-        labs.forEach(([nombre, pais]) => insertLab.run(nombre, pais));
+        const seedLabs = db.transaction((labs) => {
+            for (const lab of labs) insertLab.run(lab.nombre, lab.pais);
+        });
+        seedLabs(initialData.LABORATORIOS);
 
-        // Usuarios
+        // 3. Inserción de Proveedores
+        const insertProv = db.prepare(`
+            INSERT INTO proveedores (
+                nombre_empresa, ruc, direccion, telefono_empresa, email_empresa, 
+                nombre_contacto, cargo_contacto, telefono_contacto, email_contacto
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const seedProvs = db.transaction((provs) => {
+            for (const p of provs) {
+                insertProv.run(
+                    p.nombreEmpresa, p.ruc, p.direccion, p.telefonoEmpresa, p.emailEmpresa,
+                    p.nombreContacto, p.cargoContacto, p.telefonoContacto, p.emailContacto
+                );
+            }
+        });
+        seedProvs(initialData.PROVEEDORES);
+
+        // 4. Inserción de Productos y Presentaciones
+        const insertProd = db.prepare(`
+            INSERT INTO productos (
+                nombre_comercial, principio_activo, 
+                categoria_id, laboratorio_id, requiere_receta, es_controlado, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, 'activo')
+        `);
+
+        const insertPres = db.prepare(`
+            INSERT INTO presentaciones (
+                producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                precio_venta_unidad, precio_venta_caja, stock_minimo, codigo_barras
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const seedProds = db.transaction((prods) => {
+            for (const p of prods) {
+                const cat = db.prepare('SELECT id FROM categorias WHERE nombre = ?').get(p.categoria);
+                const lab = p.laboratorio ? db.prepare('SELECT id FROM laboratorios WHERE nombre = ?').get(p.laboratorio) : null;
+
+                const prodResult = insertProd.run(
+                    p.nombreComercial, p.principioActivo,
+                    cat ? cat.id : null, lab ? lab.id : null,
+                    p.requiereReceta ? 1 : 0, p.esControlado ? 1 : 0
+                );
+
+                const productoId = prodResult.lastInsertRowid;
+
+                // Crear presentación por defecto
+                const unidadesPorCaja = p.unidadesPorCaja || 1;
+                const precioVentaUnidad = p.precioVentaUnidad || (p.precioVenta / unidadesPorCaja);
+                
+                insertPres.run(
+                    productoId,
+                    p.presentacion || `Caja x ${unidadesPorCaja}`,
+                    'unidad',
+                    unidadesPorCaja,
+                    precioVentaUnidad,
+                    p.precioVenta,
+                    p.stockMinimo || 5,
+                    p.codigoBarras || null
+                );
+            }
+        });
+        seedProds(initialData.PRODUCTOS);
+
+        // 5. Usuarios iniciales
         const insertUsuario = db.prepare('INSERT INTO usuarios (nombre, rol) VALUES (?, ?)');
         insertUsuario.run('Admin Sistema', 'administrador');
         insertUsuario.run('Juan Farmacéutico', 'farmaceutico');
 
-        console.log('Initial data seeded successfully');
+        console.log('Initial data seeded successfully with transactions');
     }
 }
 
@@ -350,6 +420,11 @@ function setupIpcHandlers() {
             console.error('Database get error:', error);
             return { success: false, error: error.message };
         }
+    });
+
+    // Obtener locale del sistema
+    ipcMain.handle('app:getLocale', () => {
+        return app.getLocale();
     });
 
     // Control de Ventana (Barra de título personalizada)

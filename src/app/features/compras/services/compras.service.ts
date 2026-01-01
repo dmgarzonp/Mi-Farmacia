@@ -58,9 +58,11 @@ export class ComprasService {
             const detallesSql = `
                 SELECT 
                     doc.*,
+                    pres.nombre_descriptivo as presentacion_nombre,
                     pr.nombre_comercial as producto_nombre
                 FROM ordenes_compra_detalles doc
-                LEFT JOIN productos pr ON doc.producto_id = pr.id
+                LEFT JOIN presentaciones pres ON doc.presentacion_id = pres.id
+                LEFT JOIN productos pr ON pres.producto_id = pr.id
                 WHERE doc.orden_compra_id = ?
             `;
 
@@ -76,6 +78,10 @@ export class ComprasService {
     }
 
     async crear(orden: Partial<OrdenCompra>): Promise<number> {
+        if (!orden.proveedorId || isNaN(Number(orden.proveedorId))) {
+            throw new Error('Debe seleccionar un proveedor válido para crear la orden');
+        }
+
         try {
             const ordenSql = `
                 INSERT INTO ordenes_compra (
@@ -86,14 +92,14 @@ export class ComprasService {
             `;
 
             const result = await this.db.run(ordenSql, [
-                orden.proveedorId,
+                Number(orden.proveedorId),
                 orden.fechaEmision || new Date().toISOString().split('T')[0],
                 orden.estado || EstadoOrdenCompra.PENDIENTE,
-                orden.subtotal || 0,
-                orden.descuentoMonto || 0,
-                orden.impuestoTotal || 0,
-                orden.total || 0,
-                orden.moneda || 'PEN',
+                Number(orden.subtotal) || 0,
+                Number(orden.descuentoMonto) || 0,
+                Number(orden.impuestoTotal) || 0,
+                Number(orden.total) || 0,
+                orden.moneda || 'USD',
                 orden.observaciones || null
             ]);
 
@@ -102,19 +108,21 @@ export class ComprasService {
             if (orden.detalles && orden.detalles.length > 0) {
                 const detalleSql = `
                     INSERT INTO ordenes_compra_detalles 
-                    (orden_compra_id, producto_id, cantidad, precio_unitario, subtotal, lote, fecha_vencimiento)
+                    (orden_compra_id, presentacion_id, cantidad, precio_unitario, subtotal, lote, fecha_vencimiento)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 `;
 
                 for (const detalle of orden.detalles) {
+                    if (!detalle.presentacionId) continue;
+                    
                     await this.db.run(detalleSql, [
                         ordenId,
-                        detalle.productoId,
-                        detalle.cantidad,
-                        detalle.precioUnitario,
-                        detalle.subtotal,
-                        detalle.lote,
-                        detalle.fechaVencimiento
+                        Number(detalle.presentacionId),
+                        Number(detalle.cantidad),
+                        Number(detalle.precioUnitario),
+                        Number(detalle.subtotal),
+                        detalle.lote || null,
+                        detalle.fechaVencimiento || null
                     ]);
                 }
             }
@@ -128,6 +136,10 @@ export class ComprasService {
     }
 
     async actualizar(id: number, orden: Partial<OrdenCompra>): Promise<void> {
+        if (!orden.proveedorId || isNaN(Number(orden.proveedorId))) {
+            throw new Error('Debe seleccionar un proveedor válido para actualizar la orden');
+        }
+
         try {
             const sql = `
                 UPDATE ordenes_compra 
@@ -137,16 +149,41 @@ export class ComprasService {
             `;
 
             await this.db.run(sql, [
-                orden.proveedorId,
+                Number(orden.proveedorId),
                 orden.fechaEmision,
                 orden.estado,
-                orden.subtotal,
-                orden.descuentoMonto,
-                orden.impuestoTotal,
-                orden.total,
+                Number(orden.subtotal) || 0,
+                Number(orden.descuentoMonto) || 0,
+                Number(orden.impuestoTotal) || 0,
+                Number(orden.total) || 0,
                 orden.observaciones || null,
                 id
             ]);
+
+            // Actualizar detalles (Estrategia simple: Borrar y volver a insertar para ediciones)
+            if (orden.detalles) {
+                await this.db.run(`DELETE FROM ordenes_compra_detalles WHERE orden_compra_id = ?`, [id]);
+                
+                const detalleSql = `
+                    INSERT INTO ordenes_compra_detalles 
+                    (orden_compra_id, presentacion_id, cantidad, precio_unitario, subtotal, lote, fecha_vencimiento)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `;
+
+                for (const detalle of orden.detalles) {
+                    if (!detalle.presentacionId) continue;
+
+                    await this.db.run(detalleSql, [
+                        id,
+                        Number(detalle.presentacionId),
+                        Number(detalle.cantidad),
+                        Number(detalle.precioUnitario),
+                        Number(detalle.subtotal),
+                        detalle.lote || null,
+                        detalle.fechaVencimiento || null
+                    ]);
+                }
+            }
 
             await this.cargarOrdenes();
         } catch (err: any) {
@@ -179,37 +216,83 @@ export class ComprasService {
 
     /**
      * Proceso de Recepción de Mercancía:
-     * 1. Crea/Actualiza lotes en inventario
-     * 2. Registra movimientos de stock para auditoría
-     * 3. Cambia estado de la orden
+     * 1. Actualiza los detalles de la orden con cantidades, precios, lotes/vencimientos reales
+     * 2. Actualiza el total de la orden si hubo cambios
+     * 3. Crea/Actualiza lotes en inventario (Basado en presentaciones)
+     * 4. Registra movimientos de stock para auditoría
+     * 5. Cambia estado de la orden
      */
-    async marcarComoRecibida(id: number): Promise<void> {
+    async marcarComoRecibida(id: number, detallesActualizados: DetalleOrdenCompra[], nuevoTotal?: number): Promise<void> {
         try {
             const orden = await this.obtenerPorId(id);
             if (!orden || !orden.detalles) throw new Error('Orden no encontrada');
 
-            for (const det of orden.detalles) {
-                // 1. Gestionar el lote (UPSERT manual en SQLite)
-                const sqlCheckLote = `SELECT id, stock_actual FROM lotes WHERE producto_id = ? AND lote = ?`;
-                const existingLote = await this.db.get<any>(sqlCheckLote, [det.productoId, det.lote]);
+            // 1. Actualizar detalles de la orden con datos reales de recepción
+            const updateDetSql = `
+                UPDATE ordenes_compra_detalles 
+                SET cantidad = ?, precio_unitario = ?, subtotal = ?, lote = ?, fecha_vencimiento = ? 
+                WHERE orden_compra_id = ? AND presentacion_id = ?
+            `;
+            
+            for (const det of detallesActualizados) {
+                const subtotal = det.cantidad * det.precioUnitario;
+                await this.db.run(updateDetSql, [
+                    det.cantidad, 
+                    det.precioUnitario, 
+                    subtotal, 
+                    det.lote, 
+                    det.fechaVencimiento, 
+                    id, 
+                    det.presentacionId
+                ]);
+            }
+
+            // 2. Actualizar total de la orden si cambió
+            if (nuevoTotal !== undefined) {
+                const updateOrdenSql = `UPDATE ordenes_compra SET subtotal = ?, total = ? WHERE id = ?`;
+                await this.db.run(updateOrdenSql, [nuevoTotal, nuevoTotal, id]);
+            }
+
+            // 3. Procesar inventario para cada presentación
+            for (const det of detallesActualizados) {
+                if (!det.lote || !det.fechaVencimiento) {
+                    throw new Error(`Faltan datos de lote/vencimiento para la presentación con ID ${det.presentacionId}`);
+                }
+
+                // Obtener unidades por caja de la presentación
+                const presSql = `SELECT unidades_por_caja FROM presentaciones WHERE id = ?`;
+                const pres = await this.db.get<any>(presSql, [det.presentacionId]);
+                const unidadesPorCaja = pres?.unidades_por_caja || 1;
+                
+                // Cantidad total en UNIDADES BASE
+                const cantidadTotalUnidades = det.cantidad * unidadesPorCaja;
+                const precioCompraUnitario = det.precioUnitario / unidadesPorCaja;
+
+                // Gestionar el lote (UPSERT manual en SQLite)
+                const sqlCheckLote = `SELECT id, stock_actual FROM lotes WHERE presentacion_id = ? AND lote = ?`;
+                const existingLote = await this.db.get<any>(sqlCheckLote, [det.presentacionId, det.lote]);
 
                 let loteId: number;
                 if (existingLote) {
                     loteId = existingLote.id;
                     const sqlUpdateLote = `UPDATE lotes SET stock_actual = stock_actual + ? WHERE id = ?`;
-                    await this.db.run(sqlUpdateLote, [det.cantidad, loteId]);
+                    await this.db.run(sqlUpdateLote, [cantidadTotalUnidades, loteId]);
                 } else {
                     const sqlInsertLote = `
-                        INSERT INTO lotes (producto_id, lote, fecha_vencimiento, stock_actual, fecha_ingreso)
-                        VALUES (?, ?, ?, ?, CURRENT_DATE)
+                        INSERT INTO lotes (
+                            presentacion_id, lote, fecha_vencimiento, stock_actual, 
+                            precio_compra_caja, precio_compra_unitario, fecha_ingreso
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_DATE)
                     `;
                     const resLote = await this.db.run(sqlInsertLote, [
-                        det.productoId, det.lote, det.fechaVencimiento, det.cantidad
+                        det.presentacionId, det.lote, det.fechaVencimiento, cantidadTotalUnidades,
+                        det.precioUnitario, precioCompraUnitario
                     ]);
                     loteId = resLote.lastInsertRowid;
                 }
 
-                // 2. Registrar Movimiento de Stock
+                // Registrar Movimiento de Stock
                 const sqlMov = `
                     INSERT INTO movimientos_stock (tipo, lote_id, cantidad, documento_referencia, observaciones)
                     VALUES (?, ?, ?, ?, ?)
@@ -217,9 +300,9 @@ export class ComprasService {
                 await this.db.run(sqlMov, [
                     TipoMovimiento.ENTRADA_COMPRA,
                     loteId,
-                    det.cantidad,
-                    `OC-${orden.id}`,
-                    `Recepción de orden de compra #${orden.id}`
+                    cantidadTotalUnidades,
+                    `OC-${id}`,
+                    `Recepción de OC #${id} (${det.cantidad} CAJAS x ${unidadesPorCaja} unid.)`
                 ]);
             }
 

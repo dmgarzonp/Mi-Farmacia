@@ -1,38 +1,54 @@
-<div class="max-w-6xl mx-auto space-y-6 pb-12">
-  <!-- Header con Estética Premium -->
-  <div class="flex items-center justify-between animate-fade-in">
+<div class="max-w-7xl mx-auto px-4 pb-20">
+  <!-- Cabecera Minimalista -->
+  <div class="flex items-center justify-between py-8 animate-fade-in">
     <div>
-      <h1 class="text-2xl font-black text-gray-900 tracking-tight">{{ isEditMode ? 'Editar' : 'Nueva' }} Orden de Compra</h1>
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Suministro de Mercancía a Almacén</p>
+      <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+        {{ soloLectura ? 'Detalle de Orden' : (isEditMode ? 'Edición de Orden' : 'Nueva Orden de Compra') }}
+        <span class="text-xs font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded-lg uppercase tracking-widest" *ngIf="isEditMode">#{{ ordenId }}</span>
+      </h1>
+      
+      <!-- Indicador de Auto-guardado -->
+      <div class="flex items-center gap-2 mt-2" *ngIf="!soloLectura && (autoGuardando() || ultimoGuardado())">
+        <div class="flex items-center gap-1.5" *ngIf="autoGuardando()">
+          <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
+          <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sincronizando...</span>
+        </div>
+        <div class="flex items-center gap-1.5" *ngIf="!autoGuardando() && ultimoGuardado()">
+          <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+          <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Cambios guardados {{ ultimoGuardado() | date:'HH:mm:ss' }}
+          </span>
+        </div>
+      </div>
+      
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1" *ngIf="!autoGuardando() && !ultimoGuardado()">Módulo de Abastecimiento Logístico</p>
     </div>
-    <app-button
-      variant="secondary"
-      (clicked)="volver()"
-      iconNameLeft="BACK"
-    >
-      Volver
-    </app-button>
+    <button (click)="volver()" class="group flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+      <span class="w-4 h-4 block group-hover:-translate-x-1 transition-transform" [innerHTML]="icons.BACK | safeHtml"></span>
+      <span class="text-xs font-black uppercase tracking-widest">Regresar</span>
+    </button>
   </div>
 
-  <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-slide-up">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-fade-in">
+    <div class="flex flex-col xl:flex-row gap-10 items-start">
       
-      <!-- Columna Izquierda: Datos Generales -->
-      <div class="lg:col-span-1 space-y-6">
-        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium p-8 rounded-3xl">
-          <h3 class="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center">
-            <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full"></span>
-            Datos Generales
+      <!-- Columna Lateral: Configuración y Totales -->
+      <div class="w-full xl:w-[380px] space-y-6 xl:sticky xl:top-6">
+        
+        <!-- Datos de Proveedor y Fecha -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <span class="w-1 h-3 bg-emerald-500 rounded-full"></span>
+            Datos del Pedido
           </h3>
           
-          <div class="space-y-6">
+          <div class="space-y-5">
             <app-autocomplete
               label="Proveedor"
               [items]="proveedoresItems"
               formControlName="proveedorId"
               placeholder="Buscar proveedor..."
               [required]="true"
-              iconName="USERS"
               [hasError]="!!(form.get('proveedorId')?.invalid && form.get('proveedorId')?.touched)"
             ></app-autocomplete>
 
@@ -45,189 +61,213 @@
             <app-input
               label="Observaciones"
               formControlName="observaciones"
-              placeholder="Notas sobre el envío o proveedor..."
-              iconName="CLIPBOARD"
+              placeholder="Ej: Entrega en almacén central..."
             ></app-input>
 
             <div *ngIf="isEditMode">
-              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Estado</label>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Estado de Orden</label>
               <div class="relative group">
-                <select formControlName="estado" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm appearance-none">
+                <select formControlName="estado" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-bold text-slate-700 appearance-none cursor-pointer">
+                  <option [value]="EstadoOrdenCompra.BORRADOR">Borrador</option>
                   <option [value]="EstadoOrdenCompra.PENDIENTE">Pendiente</option>
                   <option [value]="EstadoOrdenCompra.APROBADA">Aprobada</option>
                   <option [value]="EstadoOrdenCompra.RECIBIDA">Recibida</option>
                   <option [value]="EstadoOrdenCompra.CANCELADA">Cancelada</option>
                 </select>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <span class="w-4 h-4 block" [innerHTML]="icons.CHEVRON_DOWN | safeHtml"></span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Resumen de Totales Premium -->
-        <div class="bg-primary-900 text-white p-8 rounded-3xl shadow-premium relative overflow-hidden group">
-          <div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-500/10 rounded-full blur-2xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
+        <!-- Resumen de Costos (Estética Soft-Premium) -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm relative overflow-hidden group">
+          <!-- Efectos de fondo sutiles -->
+          <div class="absolute -right-10 -top-10 w-40 h-40 bg-slate-50 rounded-full blur-3xl group-hover:bg-emerald-50 transition-all duration-1000"></div>
           
-          <h3 class="text-xs font-black text-primary-400 uppercase tracking-[0.2em] mb-6 flex items-center">
-            <span class="w-4 h-4 mr-2" [innerHTML]="icons.CHART | safeHtml"></span>
-            Resumen de Orden
-          </h3>
-          
-          <div class="space-y-4">
-            <div class="flex justify-between items-center text-primary-100/70 text-sm">
-              <span class="font-medium">Total de Productos:</span>
-              <span class="text-lg font-black text-white">{{ detalles.length }}</span>
-            </div>
-            
-            <div class="pt-6 border-t border-white/10">
-              <div class="flex flex-col gap-1">
-                <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest">Importe Total (PEN)</span>
-                <div class="flex items-baseline gap-2">
-                  <span class="text-xl font-medium text-primary-300">S/</span>
-                  <span class="text-4xl font-black text-white tracking-tight">{{ totalOrden.toFixed(2) }}</span>
+          <div class="relative z-10 space-y-8">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Resumen de Totales</p>
+                <div class="flex items-center gap-2">
+                  <span class="text-2xl font-black text-slate-800">{{ detalles.length }}</span>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Productos</span>
                 </div>
               </div>
+              <div class="text-right">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Estado Orden</p>
+                <p class="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border"
+                   [ngClass]="{
+                     'bg-slate-100 text-slate-500 border-slate-200': form.get('estado')?.value === EstadoOrdenCompra.BORRADOR,
+                     'bg-amber-100 text-amber-700 border-amber-200': form.get('estado')?.value === EstadoOrdenCompra.PENDIENTE,
+                     'bg-blue-100 text-blue-700 border-blue-200': form.get('estado')?.value === EstadoOrdenCompra.APROBADA,
+                     'bg-emerald-100 text-emerald-700 border-emerald-200': form.get('estado')?.value === EstadoOrdenCompra.RECIBIDA,
+                     'bg-red-100 text-red-700 border-red-200': form.get('estado')?.value === EstadoOrdenCompra.CANCELADA
+                   }">
+                  {{ form.get('estado')?.value || 'NUEVA' }}
+                </p>
+              </div>
             </div>
-          </div>
-          
-          <div class="mt-8">
-            <app-button
-              type="submit"
-              variant="primary"
-              [fullWidth]="true"
-              [disabled]="form.invalid || guardando || detalles.length === 0"
-              iconNameLeft="SAVE"
-              [loading]="guardando"
-            >
-              {{ isEditMode ? 'Actualizar Orden' : 'Confirmar Orden' }}
-            </app-button>
+            
+            <div class="pt-8 border-t border-slate-100 space-y-1">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">{{ soloLectura ? 'Monto Total' : 'Monto Total Estimado' }}</p>
+              <div class="flex items-baseline gap-2">
+                <span class="text-5xl font-black text-slate-900 tracking-tighter leading-none">{{ totalOrden | currencyFormat }}</span>
+              </div>
+            </div>
+
+            <div class="pt-6 space-y-3" *ngIf="!soloLectura">
+              <app-button
+                type="button"
+                variant="secondary"
+                [fullWidth]="true"
+                (clicked)="guardarComoBorrador()"
+                [disabled]="guardando || detalles.length === 0"
+                iconNameLeft="EDIT"
+                class="!bg-slate-50 !border-slate-200 !text-slate-600 hover:!bg-slate-100"
+              >
+                Guardar Borrador
+              </app-button>
+              
+              <app-button
+                type="submit"
+                variant="primary"
+                [fullWidth]="true"
+                [disabled]="form.invalid || guardando || detalles.length === 0"
+                iconNameLeft="SAVE"
+                [loading]="guardando"
+                class="shadow-lg shadow-emerald-500/10"
+              >
+                {{ isEditMode ? 'Actualizar Orden' : 'Confirmar Pedido' }}
+              </app-button>
+            </div>
+            
+            <div class="pt-6" *ngIf="soloLectura">
+              <p class="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                Esta orden está en estado final y no permite modificaciones.
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Columna Derecha: Detalle de Productos -->
-      <div class="lg:col-span-2 space-y-6">
-        <div class="bg-white/80 backdrop-blur-xl border border-white/20 shadow-premium rounded-3xl overflow-hidden">
-          <div class="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-gray-50/50">
-            <div>
-              <h3 class="text-sm font-black text-gray-800 uppercase tracking-[0.15em] flex items-center">
-                <span class="w-1.5 h-4 bg-primary-500 mr-3 rounded-full"></span>
-                Detalle de Productos
-              </h3>
-              <p class="text-[11px] text-gray-400 font-medium mt-1 uppercase tracking-wider">Define el lote y vencimiento de cada item</p>
+      <!-- Columna Principal: Lista de Productos -->
+      <div class="flex-1 min-w-0 space-y-6">
+        
+        <!-- Buscador Único (Sin cards, diseño limpio) -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm" *ngIf="!soloLectura">
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <span class="w-1 h-3 bg-emerald-500 rounded-full"></span>
+            Añadir Producto a la Orden
+          </h3>
+          
+          <div class="relative">
+            <app-autocomplete
+              [items]="productosItems"
+              placeholder="ESCRIBE EL NOMBRE O CÓDIGO DEL PRODUCTO AQUÍ..."
+              (itemSelected)="onGlobalProductoSelected($event)"
+              [autoClear]="true"
+              iconName="SEARCH"
+            ></app-autocomplete>
+            <div class="mt-3 flex items-center justify-between px-1">
+              <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Selecciona un resultado para agregarlo automáticamente
+              </p>
+              <button type="button" (click)="agregarDetalle()" class="text-[10px] font-black text-emerald-600 uppercase hover:underline">
+                + Fila Manual
+              </button>
             </div>
-            <app-button
-              type="button"
-              variant="secondary"
-              size="sm"
-              (clicked)="agregarDetalle()"
-              iconNameLeft="ADD"
-            >
-              Nuevo Item
-            </app-button>
           </div>
+        </div>
 
-          <div class="p-8">
-            <div formArrayName="detalles" class="space-y-4">
-              <div *ngFor="let det of detalles.controls; let i = index" [formGroupName]="i" 
-                   class="grid grid-cols-12 gap-4 p-5 bg-gray-50/50 hover:bg-white border border-gray-100 hover:border-primary-200 hover:shadow-md rounded-2xl transition-all group">
-                
-                <!-- Buscador de Producto -->
-                <div class="col-span-12 md:col-span-5">
-                  <app-autocomplete
-                    [items]="productosItems"
-                    formControlName="productoId"
-                    placeholder="Buscar producto..."
-                    [required]="true"
-                    (itemSelected)="onProductoSelected($event, i)"
-                    [hasError]="!!(det.get('productoId')?.invalid && det.get('productoId')?.touched)"
-                  ></app-autocomplete>
-                </div>
+        <!-- Encabezado de lista cuando es solo lectura -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between" *ngIf="soloLectura">
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <span class="w-1 h-3 bg-slate-400 rounded-full"></span>
+            Productos de la Orden
+          </h3>
+          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Solo Vista</span>
+        </div>
 
-                <!-- Cantidad -->
-                <div class="col-span-4 md:col-span-2">
-                  <app-input
-                    type="number"
-                    formControlName="cantidad"
-                    placeholder="0"
-                    label="Cant."
-                    (input)="calcularSubtotal(i)"
-                  ></app-input>
-                </div>
+        <!-- Listado Detallado -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100">
+                  <th class="px-6 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Presentación / Producto</th>
+                  <th class="px-4 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-28 text-center">Cant. Cajas</th>
+                  <th class="px-4 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-36 text-center">Precio x Caja</th>
+                  <th class="px-6 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-40 text-right">Subtotal</th>
+                  <th class="px-4 py-4 w-12" *ngIf="!soloLectura"></th>
+                </tr>
+              </thead>
+              <tbody formArrayName="detalles">
+                <ng-container *ngFor="let det of detalles.controls; let i = index" [formGroupName]="i">
+                  <tr class="hover:bg-slate-50 transition-colors group">
+                    <td class="px-6 py-4 border-b border-slate-50">
+                      <div class="flex flex-col">
+                        <span class="font-bold text-slate-700 text-sm leading-tight">{{ getPresentacionNombre(det.get('presentacionId')?.value) }}</span>
+                        <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter mt-1">
+                          {{ getProductoNombrePorPresentacion(det.get('presentacionId')?.value) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-4 border-b border-slate-50">
+                      <input
+                        type="number"
+                        formControlName="cantidad"
+                        (input)="calcularSubtotal(i)"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-bold text-center disabled:opacity-75 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td class="px-4 py-4 border-b border-slate-50">
+                      <div class="relative">
+                        <input
+                          type="number"
+                          formControlName="precioUnitario"
+                          (input)="calcularSubtotal(i)"
+                          class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-bold text-right disabled:opacity-75 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 border-b border-slate-50 text-right">
+                      <span class="text-sm font-black text-slate-900">{{ det.get('subtotal')?.value | currencyFormat }}</span>
+                    </td>
+                    <td class="px-4 py-4 border-b border-slate-50 text-center" *ngIf="!soloLectura">
+                      <button 
+                        type="button" 
+                        (click)="removerDetalle(i)"
+                        class="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <span class="w-4 h-4 block" [innerHTML]="icons.DELETE | safeHtml"></span>
+                      </button>
+                    </td>
+                  </tr>
+                </ng-container>
 
-                <!-- Precio Unitario -->
-                <div class="col-span-4 md:col-span-2">
-                  <app-input
-                    type="number"
-                    formControlName="precioUnitario"
-                    placeholder="0.00"
-                    label="P. Unit"
-                    (input)="calcularSubtotal(i)"
-                  ></app-input>
-                </div>
-
-                <!-- Subtotal -->
-                <div class="col-span-4 md:col-span-2 flex flex-col justify-center">
-                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Subtotal</span>
-                  <div class="px-4 py-2.5 bg-primary-50 rounded-xl border border-primary-100">
-                    <span class="text-sm font-black text-primary-700">S/ {{ det.get('subtotal')?.value?.toFixed(2) || '0.00' }}</span>
-                  </div>
-                </div>
-
-                <!-- Segunda Fila: Lote y Vencimiento -->
-                <div class="col-span-12 md:col-span-11 grid grid-cols-2 gap-4">
-                  <app-input
-                    type="text"
-                    formControlName="lote"
-                    placeholder="Ej: LOTE-123"
-                    label="Nº Lote"
-                  ></app-input>
-                  
-                  <app-date-picker
-                    formControlName="fechaVencimiento"
-                    label="Vencimiento"
-                    [required]="true"
-                  ></app-date-picker>
-                </div>
-
-                <!-- Botón Eliminar -->
-                <div class="col-span-12 md:col-span-1 flex items-end justify-end pb-1">
-                  <button 
-                    type="button" 
-                    (click)="removerDetalle(i)"
-                    class="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group/del"
-                    title="Quitar de la lista"
-                  >
-                    <span class="w-5 h-5 block group-hover/del:scale-110 transition-transform" [innerHTML]="icons.DELETE | safeHtml"></span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Estado Vacío -->
-              <div *ngIf="detalles.length === 0" 
-                   class="py-16 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
-                <div class="flex flex-col items-center gap-4">
-                  <div class="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-gray-200">
-                    <span class="w-8 h-8" [innerHTML]="icons.BOXES | safeHtml"></span>
-                  </div>
-                  <div>
-                    <h4 class="text-sm font-bold text-gray-600">No hay productos</h4>
-                    <p class="text-xs text-gray-400 mt-1">Haz clic en "Nuevo Item" para comenzar</p>
-                  </div>
-                  <app-button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    (clicked)="agregarDetalle()"
-                    iconNameLeft="ADD"
-                  >
-                    Agregar Primer Producto
-                  </app-button>
-                </div>
-              </div>
-            </div>
+                <tr *ngIf="detalles.length === 0">
+                  <td [attr.colspan]="soloLectura ? 4 : 5" class="py-24 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                      <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
+                        <span class="w-8 h-8" [innerHTML]="icons.BOXES | safeHtml"></span>
+                      </div>
+                      <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest">No hay productos en esta orden</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end" *ngIf="detalles.length > 0 && !soloLectura">
+            <button type="button" (click)="limpiarLista()" class="flex items-center gap-2 text-[9px] font-black text-red-400 hover:text-red-600 uppercase tracking-widest transition-colors">
+              <span class="w-3 h-3 block" [innerHTML]="icons.DELETE | safeHtml"></span>
+              Limpiar Todo
+            </button>
           </div>
         </div>
       </div>

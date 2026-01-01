@@ -8,16 +8,37 @@
           {{ stats().total }} Items
         </span>
       </h1>
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de Inventario Maestro y Control de Stock</p>
-    </div>
-    <div class="flex gap-3">
-      <app-button variant="secondary" (clicked)="gestionarLaboratorios()" iconNameLeft="LABORATORIES">Laboratorios</app-button>
-      <app-button variant="secondary" (clicked)="gestionarCategorias()" iconNameLeft="CATEGORIES">Categorías</app-button>
-      <app-button variant="primary" (clicked)="crearNuevo()" iconNameLeft="ADD" class="shadow-lg shadow-primary-500/20">
-        Nuevo Producto
-      </app-button>
-    </div>
-  </div>
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de Inventario Maestro y Control de Stock</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- Grupo de Catálogos Rápidos -->
+          <div class="hidden md:flex bg-white rounded-2xl border border-gray-100 shadow-sm p-1 items-center">
+            <button
+              (click)="gestionarLaboratorios()"
+              class="flex items-center gap-2 px-4 py-2 text-xs font-black text-gray-600 hover:bg-primary-50 hover:text-primary-600 rounded-xl transition-all group"
+              title="Añadir Laboratorio"
+            >
+              <span class="w-4 h-4 block group-hover:scale-110 transition-transform" [innerHTML]="icons.LABORATORIES | safeHtml"></span>
+              <span class="uppercase tracking-wider">+ Lab</span>
+            </button>
+            
+            <div class="w-px h-4 bg-gray-100 mx-1"></div>
+            
+            <button
+              (click)="gestionarCategorias()"
+              class="flex items-center gap-2 px-4 py-2 text-xs font-black text-gray-600 hover:bg-primary-50 hover:text-primary-600 rounded-xl transition-all group"
+              title="Añadir Categoría"
+            >
+              <span class="w-4 h-4 block group-hover:scale-110 transition-transform" [innerHTML]="icons.CATEGORIES | safeHtml"></span>
+              <span class="uppercase tracking-wider">+ Cat</span>
+            </button>
+          </div>
+
+          <app-button variant="primary" (clicked)="crearNuevo()" iconNameLeft="ADD" class="shadow-lg shadow-primary-500/20">
+            Nuevo Producto
+          </app-button>
+        </div>
+      </div>
 
   <!-- KPI Cards -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
@@ -80,24 +101,25 @@
 
     <!-- Card 4: Vencimientos -->
     <div 
-      class="bg-primary-900 p-6 rounded-3xl shadow-lg relative overflow-hidden group transition-all hover:scale-[1.02] cursor-pointer"
+      class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer"
     >
-      <div class="absolute -right-4 -top-4 w-20 h-20 bg-primary-500/10 rounded-full blur-2xl group-hover:bg-primary-500/20 transition-all duration-700"></div>
       <div class="flex items-center gap-4 relative z-10">
-        <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-primary-300">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
           <span class="w-6 h-6 block" [innerHTML]="icons.CALENDAR | safeHtml"></span>
         </div>
         <div>
-          <p class="text-[10px] font-black text-primary-400 uppercase tracking-widest italic">Vencen pronto</p>
-          <p class="text-2xl font-black text-white">{{ stats().vencimientosProximos }}</p>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Vencen pronto</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().vencimientosProximos }}</p>
         </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
   </div>
 
-  <!-- Búsqueda y Filtros -->
-  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium flex flex-wrap gap-4 items-center animate-slide-up" style="animation-delay: 100ms">
-    <div class="flex-1 min-w-[300px] relative group">
+  <!-- Búsqueda y Filtros Premium -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-premium flex flex-col lg:flex-row gap-6 items-center animate-slide-up" style="animation-delay: 100ms">
+    <!-- Buscador -->
+    <div class="flex-1 min-w-[300px] relative group w-full">
       <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
         <span class="w-5 h-5 block" [innerHTML]="icons.SEARCH | safeHtml"></span>
       </span>
@@ -118,61 +140,238 @@
       }
     </div>
 
-    <div class="w-64 relative">
-      <select 
-        [(ngModel)]="selectedCategoria" 
-        (change)="onCategoriaChange()"
-        class="w-full pl-4 pr-10 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium appearance-none cursor-pointer"
-      >
-        <option value="">Todas las categorías</option>
-        <option *ngFor="let cat of categoriasService.categorias()" [value]="cat.id">{{ cat.nombre }}</option>
-      </select>
-      <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-      </div>
-    </div>
+    <!-- Herramientas de Datos -->
+    <app-table-tools
+      (importExcel)="onImportExcel($event)"
+      (exportExcel)="exportToExcel()"
+      (exportPdf)="exportToPdf()"
+      (downloadTemplate)="onDownloadTemplate()"
+    ></app-table-tools>
 
-    <app-button
-      *ngIf="searchTerm || selectedCategoria || filterType !== 'all'"
-      variant="secondary"
-      (clicked)="searchTerm = ''; selectedCategoria = ''; filterType = 'all'; applyFilter()"
-      iconNameLeft="CANCEL"
-    >
-      Limpiar Filtros
-    </app-button>
+        <div class="w-full lg:w-64 relative">
+          <select
+            [(ngModel)]="selectedCategoria"
+            (change)="onCategoriaChange()"
+            class="w-full pl-4 pr-10 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all text-sm font-medium appearance-none cursor-pointer"
+          >
+            <option value="">Todas las categorías</option>
+            <option *ngFor="let cat of categoriasService.categorias()" [value]="cat.id">{{ cat.nombre }}</option>
+          </select>
+          <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <!-- Filtro de Estado -->
+        <div class="flex bg-gray-100 p-1 rounded-2xl border border-gray-200">
+          <button 
+            (click)="statusFilter.set('activo'); applyFilter()"
+            class="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+            [class.bg-white]="statusFilter() === 'activo'"
+            [class.text-primary-600]="statusFilter() === 'activo'"
+            [class.shadow-sm]="statusFilter() === 'activo'"
+            [class.text-gray-400]="statusFilter() !== 'activo'"
+          >
+            Activos
+          </button>
+          <button 
+            (click)="statusFilter.set('inactivo'); applyFilter()"
+            class="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+            [class.bg-white]="statusFilter() === 'inactivo'"
+            [class.text-red-600]="statusFilter() === 'inactivo'"
+            [class.shadow-sm]="statusFilter() === 'inactivo'"
+            [class.text-gray-400]="statusFilter() !== 'inactivo'"
+          >
+            Inactivos
+          </button>
+        </div>
+
+        <app-button
+          *ngIf="searchTerm || selectedCategoria || filterType !== 'all' || statusFilter() !== 'activo'"
+          variant="secondary"
+          (clicked)="searchTerm = ''; selectedCategoria = ''; filterType = 'all'; statusFilter.set('activo'); applyFilter()"
+          iconNameLeft="CANCEL"
+        >
+          Limpiar
+        </app-button>
   </div>
 
-  <!-- Tabla o Skeletons -->
+  <!-- Tabla -->
   <div class="animate-slide-up" style="animation-delay: 200ms">
-    @if (productosService.loading()) {
-      <div class="bg-white rounded-3xl border border-gray-100 p-8 space-y-6">
-        <div class="flex gap-4">
-          <app-skeleton width="150px" height="2rem"></app-skeleton>
-          <app-skeleton width="100px" height="2rem"></app-skeleton>
-        </div>
-        <div class="space-y-4">
-          @for (i of [1,2,3,4,5,6]; track i) {
-            <div class="flex items-center gap-4 border-b border-gray-50 pb-4">
-              <app-skeleton width="48px" height="48px"></app-skeleton>
-              <div class="flex-1 space-y-2">
-                <app-skeleton width="40%" height="1.2rem"></app-skeleton>
-                <app-skeleton width="25%" height="0.8rem"></app-skeleton>
-              </div>
-              <app-skeleton width="120px" height="1.5rem"></app-skeleton>
-              <app-skeleton width="80px" height="2rem"></app-skeleton>
+    <app-table
+      [columns]="columns"
+      [data]="filteredProductos()"
+      [loading]="productosService.loading()"
+      [searchTerm]="searchTerm"
+      [actions]="actions"
+      emptyCtaLabel="Registrar Primer Producto"
+      emptyCtaIcon="ADD"
+      (emptyCtaClicked)="crearNuevo()"
+    ></app-table>
+  </div>
+
+  <!-- Modal Detalle de Producto -->
+  <app-modal
+    [isOpen]="showModalDetalle()"
+    title="Ficha Técnica del Producto"
+    size="lg"
+    (closed)="cerrarDetalle()"
+  >
+    @if (selectedProducto()) {
+      <div class="space-y-8 p-2">
+        <!-- Cabecera de la Ficha -->
+        <div class="flex items-start justify-between bg-primary-50/50 p-6 rounded-[2rem] border border-primary-100/50">
+          <div class="flex items-center gap-6">
+            <div class="w-20 h-20 rounded-3xl bg-white shadow-sm border border-primary-100 flex items-center justify-center text-primary-500">
+              <span class="w-10 h-10 block" [innerHTML]="icons.BOXES | safeHtml"></span>
             </div>
-          }
+            <div>
+              <h2 class="text-2xl font-black text-gray-900 tracking-tight">{{ selectedProducto()?.nombreComercial }}</h2>
+              <div class="flex flex-wrap items-center gap-3 mt-1">
+                <span class="px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-700 text-[10px] font-black uppercase tracking-wider">
+                  SKU: {{ selectedProducto()?.codigoInterno || 'SIN SKU' }}
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
+                  {{ selectedProducto()?.categoriaNombre }}
+                </span>
+                @if (selectedProducto()?.esControlado) {
+                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-black uppercase tracking-wider">
+                    CONTROLADO
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Información Base</p>
+            <p class="text-xs font-bold text-primary-600 mt-1 uppercase">Catálogo Maestro</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
+          <!-- Especificaciones Farmacéuticas -->
+          <div class="space-y-6">
+            <h3 class="text-xs font-black text-primary-600 uppercase tracking-widest flex items-center gap-2">
+              <span class="w-1.5 h-3 bg-primary-500 rounded-full"></span>
+              Especificaciones
+            </h3>
+            
+            <div class="space-y-4">
+              <div class="flex flex-col">
+                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Principio Activo</span>
+                <span class="text-sm font-semibold text-gray-700">
+                  {{ selectedProducto()?.principioActivo || 'No aplica (Insumo / Varios)' }}
+                </span>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Laboratorio Fabricante</span>
+                <span class="text-sm font-semibold text-gray-700 italic underline decoration-gray-200">
+                  {{ selectedProducto()?.laboratorioNombre || 'No asignado / Insumo médico' }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2 mt-4">
+                @if (selectedProducto()?.requiereReceta) {
+                  <div class="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase">
+                    <span class="w-3 h-3 block" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+                    Requiere Receta Médica
+                  </div>
+                } @else {
+                  <div class="text-[10px] font-bold text-gray-400 uppercase italic">Venta libre</div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Estado de Inventario Detallado -->
+          <div class="space-y-6">
+            <h3 class="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+              <span class="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
+              Presentaciones y Stock
+            </h3>
+            
+            <div class="space-y-3">
+              <div *ngFor="let pres of selectedProducto()?.presentaciones" 
+                   class="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-black text-slate-700 uppercase">{{ pres.nombreDescriptivo }}</p>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Unidad: {{ pres.unidadBase }}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-lg font-black text-emerald-600 leading-none">{{ pres.stockTotal || 0 }}</p>
+                  <p class="text-[9px] text-emerald-400 font-bold uppercase tracking-widest">En Stock</p>
+                </div>
+              </div>
+
+              @if (!selectedProducto()?.presentaciones?.length) {
+                <div class="py-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sin presentaciones registradas</p>
+                </div>
+              }
+            </div>
+
+            <!-- Botón de acción rápida -->
+            <app-button 
+              variant="primary" 
+              class="w-full" 
+              iconNameLeft="BOXES"
+              (clicked)="cerrarDetalle(); verLotes(selectedProducto()!)"
+            >
+              Ver Movimientos / Kardex
+            </app-button>
+          </div>
+        </div>
+
+        <div class="flex justify-end p-4 border-t border-gray-100 gap-3">
+          <app-button variant="secondary" (clicked)="cerrarDetalle()">Cerrar Ficha</app-button>
         </div>
       </div>
-    } @else {
-      <app-table
-        [columns]="columns"
-        [data]="filteredProductos()"
-        [actions]="actions"
-        emptyCtaLabel="Registrar Primer Producto"
-        emptyCtaIcon="ADD"
-        (emptyCtaClicked)="crearNuevo()"
-      ></app-table>
     }
-  </div>
-</div>
+      </app-modal>
+
+      <!-- Modal de Edición/Creación de Producto -->
+      <app-modal
+        [isOpen]="showModalEdicion()"
+        [title]="idProductoEdicion() ? 'Editar Producto' : 'Nuevo Producto'"
+        size="2xl"
+        (closed)="showModalEdicion.set(false)"
+      >
+        @if (showModalEdicion()) {
+          <app-producto-form 
+            [id]="idProductoEdicion() || undefined"
+            [isModalMode]="true"
+            (saved)="onProductoSaved()"
+            (cancelled)="showModalEdicion.set(false)"
+          ></app-producto-form>
+        }
+      </app-modal>
+
+      <!-- Modal de Registro Rápido de Laboratorio -->
+      <app-modal
+        [isOpen]="showModalLaboratorios()"
+        title="Nuevo Laboratorio"
+        size="md"
+        (closed)="showModalLaboratorios.set(false)"
+      >
+        @if (showModalLaboratorios()) {
+          <app-laboratorio-quick-form 
+            (guardado)="showModalLaboratorios.set(false)"
+            (cancelar)="showModalLaboratorios.set(false)"
+          ></app-laboratorio-quick-form>
+        }
+      </app-modal>
+
+      <!-- Modal de Registro Rápido de Categoría -->
+      <app-modal
+        [isOpen]="showModalCategorias()"
+        title="Nueva Categoría"
+        size="md"
+        (closed)="showModalCategorias.set(false)"
+      >
+        @if (showModalCategorias()) {
+          <app-categoria-quick-form 
+            (guardado)="showModalCategorias.set(false)"
+            (cancelar)="showModalCategorias.set(false)"
+          ></app-categoria-quick-form>
+        }
+      </app-modal>
+    </div>

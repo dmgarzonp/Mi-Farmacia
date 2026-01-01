@@ -5,14 +5,16 @@ import { FormsModule } from '@angular/forms';
 import { ComprasService } from '../../services/compras.service';
 import { TableComponent, TableColumn, TableAction } from '../../../../shared/components/table/table.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
-import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton.component';
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { PersistenceService } from '../../../../shared/services/persistence.service';
+import { ModalComponent } from '../../../../shared/components/modal/modal.component';
+import { RecepcionFormComponent } from '../recepcion-form/recepcion-form.component';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { FilterPipe } from '../../../../shared/pipes/filter.pipe';
-import { OrdenCompra, EstadoOrdenCompra } from '../../../../core/models';
+import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
+import { OrdenCompra, EstadoOrdenCompra, DetalleOrdenCompra } from '../../../../core/models';
 
 /**
  * Listado de Órdenes de Compra
@@ -21,7 +23,18 @@ import { OrdenCompra, EstadoOrdenCompra } from '../../../../core/models';
 @Component({
     selector: 'app-ordenes-list',
     standalone: true,
-    imports: [CommonModule, FormsModule, TableComponent, ButtonComponent, SafeHtmlPipe, FilterPipe, SkeletonComponent],
+    imports: [
+        CommonModule, 
+        FormsModule, 
+        TableComponent, 
+        ButtonComponent, 
+        SafeHtmlPipe, 
+        FilterPipe, 
+        ModalComponent, 
+        RecepcionFormComponent,
+        CurrencyFormatPipe
+    ],
+    providers: [CurrencyFormatPipe],
     templateUrl: './ordenes-list.component.html',
     styles: []
 })
@@ -31,16 +44,23 @@ export class OrdenesListComponent implements OnInit {
     private alertService = inject(AlertService);
     private confirmService = inject(ConfirmService);
     private persistenceService = inject(PersistenceService);
+    private currencyPipe = inject(CurrencyFormatPipe);
 
     icons = APP_ICONS;
     searchTerm = '';
     EstadoOrdenCompra = EstadoOrdenCompra;
+
+    // Control de Modal de Recepción
+    showModalRecepcion = signal(false);
+    selectedOrden = signal<OrdenCompra | null>(null);
+    procesandoRecepcion = signal(false);
 
     // Totales calculados para KPIs
     stats = computed(() => {
         const ordenes = this.comprasService.ordenes();
         return {
             total: ordenes.length,
+            borradores: ordenes.filter(o => o.estado === EstadoOrdenCompra.BORRADOR).length,
             pendientes: ordenes.filter(o => o.estado === EstadoOrdenCompra.PENDIENTE).length,
             recibidas: ordenes.filter(o => o.estado === EstadoOrdenCompra.RECIBIDA).length,
             inversionTotal: ordenes.reduce((acc, o) => acc + (o.total || 0), 0)
@@ -68,7 +88,7 @@ export class OrdenesListComponent implements OnInit {
             key: 'total',
             label: 'Total',
             sortable: true,
-            render: (row) => `<span class="font-black text-primary-700">${row.moneda} ${row.total.toFixed(2)}</span>`
+            render: (row) => `<span class="font-black text-primary-700">${this.currencyPipe.transform(row.total)}</span>`
         },
         {
             key: 'estado',
@@ -79,34 +99,69 @@ export class OrdenesListComponent implements OnInit {
 
     actions: TableAction<OrdenCompra>[] = [
         {
-            label: 'Ver/Editar',
+            label: 'Editar',
+            iconName: 'EDIT',
+            variant: 'primary',
+            handler: (orden) => this.editar(orden),
+            visible: (orden) => orden.estado === EstadoOrdenCompra.BORRADOR
+        },
+        {
+            label: 'Ver Pedido',
             iconName: 'VIEW',
             variant: 'primary',
             handler: (orden) => this.editar(orden),
-            visible: (orden) => orden.estado === EstadoOrdenCompra.PENDIENTE || orden.estado === EstadoOrdenCompra.APROBADA
+            visible: (orden) => orden.estado !== EstadoOrdenCompra.BORRADOR
+        },
+        {
+            label: 'Aprobar Orden',
+            iconName: 'CHECK',
+            variant: 'success',
+            handler: (orden) => this.aprobar(orden),
+            visible: (orden) => orden.estado === EstadoOrdenCompra.PENDIENTE
         },
         {
             label: 'Recibir Mercancía',
             iconName: 'SAVE',
             variant: 'success',
             handler: (orden) => this.recibirMercancia(orden),
-            visible: (orden) => orden.estado === EstadoOrdenCompra.APROBADA || orden.estado === EstadoOrdenCompra.PENDIENTE
+            visible: (orden) => orden.estado === EstadoOrdenCompra.APROBADA || (orden.estado === EstadoOrdenCompra.PENDIENTE && !this.requiereAprobacion) 
         },
         {
             label: 'Cancelar',
             iconName: 'CANCEL',
             variant: 'danger',
             handler: (orden) => this.cancelar(orden),
-            visible: (orden) => orden.estado === EstadoOrdenCompra.PENDIENTE || orden.estado === EstadoOrdenCompra.APROBADA
+            visible: (orden) => orden.estado === EstadoOrdenCompra.PENDIENTE || orden.estado === EstadoOrdenCompra.APROBADA || orden.estado === EstadoOrdenCompra.BORRADOR
         },
         {
             label: 'Eliminar',
             iconName: 'DELETE',
             variant: 'danger',
             handler: (orden) => this.eliminar(orden),
-            visible: (orden) => orden.estado === EstadoOrdenCompra.CANCELADA
+            visible: (orden) => orden.estado === EstadoOrdenCompra.CANCELADA || orden.estado === EstadoOrdenCompra.BORRADOR
         }
     ];
+
+    // Simular configuración de sistema (esto irá al módulo de config después)
+    requiereAprobacion = true;
+
+    async aprobar(orden: OrdenCompra) {
+        const confirmed = await this.confirmService.ask({
+            title: 'Aprobar Orden',
+            message: `¿Desea aprobar la orden de compra #${orden.id}? Una vez aprobada podrá recibir la mercancía.`,
+            variant: 'primary',
+            confirmText: 'Aprobar Ahora'
+        });
+
+        if (confirmed) {
+            try {
+                await this.comprasService.cambiarEstado(orden.id!, EstadoOrdenCompra.APROBADA);
+                this.alertService.success('Orden aprobada correctamente');
+            } catch (error: any) {
+                this.alertService.error('Error al aprobar: ' + error.message);
+            }
+        }
+    }
 
     async ngOnInit() {
         const savedSearch = this.persistenceService.get<string>('compras-search');
@@ -121,6 +176,7 @@ export class OrdenesListComponent implements OnInit {
 
     getEstadoBadge(estado: EstadoOrdenCompra): string {
         const configs: Record<EstadoOrdenCompra, string> = {
+            [EstadoOrdenCompra.BORRADOR]: 'bg-slate-100 text-slate-600 border-slate-200',
             [EstadoOrdenCompra.PENDIENTE]: 'bg-amber-100 text-amber-700 border-amber-200',
             [EstadoOrdenCompra.APROBADA]: 'bg-blue-100 text-blue-700 border-blue-200',
             [EstadoOrdenCompra.RECIBIDA]: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -139,20 +195,32 @@ export class OrdenesListComponent implements OnInit {
     }
 
     async recibirMercancia(orden: OrdenCompra) {
-        const confirmed = await this.confirmService.ask({
-            title: 'Recibir Mercancía',
-            message: `¿Desea ingresar los productos de la orden #${orden.id} al inventario real? Esto creará los lotes correspondientes y actualizará el stock.`,
-            variant: 'primary',
-            confirmText: 'Ingresar a Almacén'
-        });
-
-        if (confirmed) {
-            try {
-                await this.comprasService.marcarComoRecibida(orden.id!);
-                this.alertService.success('Mercancía ingresada al inventario correctamente');
-            } catch (error: any) {
-                this.alertService.error('Error al recibir: ' + error.message);
+        // Obtenemos la orden completa con sus detalles para el modal
+        try {
+            const ordenCompleta = await this.comprasService.obtenerPorId(orden.id!);
+            if (ordenCompleta) {
+                this.selectedOrden.set(ordenCompleta);
+                this.showModalRecepcion.set(true);
             }
+        } catch (error: any) {
+            this.alertService.error('Error al cargar detalles: ' + error.message);
+        }
+    }
+
+    async confirmarRecepcion(event: {detalles: DetalleOrdenCompra[], total: number}) {
+        const orden = this.selectedOrden();
+        if (!orden) return;
+
+        this.procesandoRecepcion.set(true);
+        try {
+            await this.comprasService.marcarComoRecibida(orden.id!, event.detalles, event.total);
+            this.alertService.success('Mercancía ingresada al inventario correctamente');
+            this.showModalRecepcion.set(false);
+            this.selectedOrden.set(null);
+        } catch (error: any) {
+            this.alertService.error('Error en la recepción: ' + error.message);
+        } finally {
+            this.procesandoRecepcion.set(false);
         }
     }
 

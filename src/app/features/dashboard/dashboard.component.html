@@ -15,62 +15,59 @@
   <!-- KPI Cards Esmeralda Moderno -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- Ventas Hoy -->
-    <div class="bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-premium hover:shadow-premium-hover hover:-translate-y-2 transition-all duration-500 group">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-xs font-bold text-gray-400 tracking-widest uppercase">Ventas de hoy</p>
-          <p class="text-3xl font-black text-gray-900 mt-2">S/ {{ stats().totalVentasHoy.toFixed(2) }}</p>
-          <div class="mt-4 inline-flex items-center px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">
-            <span class="w-3 h-3 mr-1" [innerHTML]="icons.CHECK | safeHtml"></span>
-            +12% vs ayer
-          </div>
-        </div>
-        <div class="p-3 bg-primary-50 text-primary-600 rounded-2xl group-hover:bg-primary-600 group-hover:text-white group-hover:rotate-12 transition-all duration-500 flex items-center justify-center w-12 h-12 shadow-sm">
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
           <span class="w-6 h-6 block" [innerHTML]="icons.CART | safeHtml"></span>
         </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ventas de hoy</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().totalVentasHoy | currencyFormat }}</p>
+        </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
     <!-- Productos -->
-    <div class="bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-premium hover:shadow-premium-hover hover:-translate-y-2 transition-all duration-500 group">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-xs font-bold text-gray-400 tracking-widest uppercase">Catálogo</p>
-          <p class="text-3xl font-black text-gray-900 mt-2">{{ stats().totalProductos }}</p>
-          <p class="mt-4 text-xs text-gray-500 font-medium">Productos en inventario</p>
-        </div>
-        <div class="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-12 transition-all duration-500 flex items-center justify-center w-12 h-12 shadow-sm">
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-500 group-hover:scale-110 transition-transform">
           <span class="w-6 h-6 block" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
         </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Catálogo</p>
+          <p class="text-2xl font-black text-gray-900">{{ stats().totalProductos }}</p>
+        </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
     <!-- Stock Bajo -->
-    <div class="bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-premium hover:shadow-premium-hover hover:-translate-y-2 transition-all duration-500 group">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-xs font-bold text-gray-400 tracking-widest uppercase">Alertas de stock</p>
-          <p class="text-3xl font-black text-amber-600 mt-2">{{ stats().stockBajo }}</p>
-          <a routerLink="/productos" class="mt-4 block text-xs text-amber-600 font-bold hover:underline">Verificar reposición</a>
-        </div>
-        <div class="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-600 group-hover:text-white group-hover:rotate-12 transition-all duration-500 flex items-center justify-center w-12 h-12 shadow-sm">
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
           <span class="w-6 h-6 block" [innerHTML]="icons.ALERT | safeHtml"></span>
         </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Alertas de Stock</p>
+          <p class="text-2xl font-black text-amber-600">{{ stats().stockBajo }}</p>
+        </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
 
     <!-- Próximos a Vencer -->
-    <div class="bg-white/70 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-premium hover:shadow-premium-hover hover:-translate-y-2 transition-all duration-500 group">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-xs font-bold text-gray-400 tracking-widest uppercase">Vencimientos</p>
-          <p class="text-3xl font-black text-red-600 mt-2">{{ stats().vencimientosProximos }}</p>
-          <button class="mt-4 text-xs text-red-600 font-bold hover:underline cursor-pointer">Revisar lotes</button>
-        </div>
-        <div class="p-3 bg-red-50 text-red-600 rounded-2xl group-hover:bg-red-600 group-hover:text-white group-hover:rotate-12 transition-all duration-500 flex items-center justify-center w-12 h-12 shadow-sm">
+    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer">
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
           <span class="w-6 h-6 block" [innerHTML]="icons.CALENDAR | safeHtml"></span>
         </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Vencimientos</p>
+          <p class="text-2xl font-black text-red-600">{{ stats().vencimientosProximos }}</p>
+        </div>
       </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-red-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
   </div>
 

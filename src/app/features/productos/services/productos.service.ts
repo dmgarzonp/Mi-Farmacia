@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { DatabaseService } from '../../../core/services/database.service';
-import { Producto, Lote, EstadoRegistro } from '../../../core/models';
+import { Producto, Lote, EstadoRegistro, Presentacion } from '../../../core/models';
 
 /**
  * Servicio para gestión de productos (Catálogo Maestro)
@@ -17,7 +17,7 @@ export class ProductosService {
     constructor(public db: DatabaseService) { }
 
     /**
-     * Carga todos los productos activos con su stock total y relación con laboratorios
+     * Carga todos los productos activos con su relación con laboratorios
      */
     async cargarProductos(): Promise<void> {
         this.loading.set(true);
@@ -28,8 +28,7 @@ export class ProductosService {
                 SELECT 
                     p.*,
                     c.nombre as categoria_nombre,
-                    l.nombre as laboratorio_nombre,
-                    (SELECT SUM(stock_actual) FROM lotes WHERE producto_id = p.id) as stock_total
+                    l.nombre as laboratorio_nombre
                 FROM productos p
                 LEFT JOIN categorias c ON p.categoria_id = c.id
                 LEFT JOIN laboratorios l ON p.laboratorio_id = l.id
@@ -39,6 +38,19 @@ export class ProductosService {
 
             const result = await this.db.query<any>(sql);
             const productos = this.db.toCamelCase(result) as Producto[];
+            
+            // Cargar presentaciones para cada producto
+            for (const prod of productos) {
+                const presSql = `
+                    SELECT pres.*, 
+                    (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
+                    FROM presentaciones pres 
+                    WHERE pres.producto_id = ?
+                `;
+                const presResult = await this.db.query<any>(presSql, [prod.id]);
+                prod.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+            }
+
             this.productos.set(productos);
         } catch (err: any) {
             this.error.set(err.message || 'Error al cargar productos');
@@ -54,8 +66,7 @@ export class ProductosService {
                 SELECT 
                     p.*,
                     c.nombre as categoria_nombre,
-                    l.nombre as laboratorio_nombre,
-                    (SELECT SUM(stock_actual) FROM lotes WHERE producto_id = p.id) as stock_total
+                    l.nombre as laboratorio_nombre
                 FROM productos p
                 LEFT JOIN categorias c ON p.categoria_id = c.id
                 LEFT JOIN laboratorios l ON p.laboratorio_id = l.id
@@ -63,44 +74,51 @@ export class ProductosService {
             `;
             const producto = await this.db.get<any>(sql, [id]);
             if (!producto) return null;
-            return this.db.toCamelCase(producto) as Producto;
+            
+            const prodObj = this.db.toCamelCase(producto) as Producto;
+            
+            // Cargar presentaciones
+            const presSql = `
+                SELECT pres.*, 
+                (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
+                FROM presentaciones pres 
+                WHERE pres.producto_id = ?
+            `;
+            const presResult = await this.db.query<any>(presSql, [id]);
+            prodObj.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+
+            return prodObj;
         } catch (err: any) {
             console.error('Error obteniendo producto:', err);
             throw err;
         }
     }
 
-    async obtenerLotes(productoId: number): Promise<Lote[]> {
+    async obtenerLotes(presentacionId: number): Promise<Lote[]> {
         try {
             const sql = `
                 SELECT * FROM lotes 
-                WHERE producto_id = ? 
+                WHERE presentacion_id = ? 
                 ORDER BY fecha_vencimiento ASC
             `;
-            const result = await this.db.query<any>(sql, [productoId]);
+            const result = await this.db.query<any>(sql, [presentacionId]);
             return this.db.toCamelCase(result) as Lote[];
         } catch (err: any) {
-            console.error('Error obteniendo lotes del producto:', err);
+            console.error('Error obteniendo lotes de la presentación:', err);
             throw err;
         }
     }
 
     async buscarPorCodigoBarras(codigoBarras: string): Promise<Producto | null> {
         try {
-            const sql = `
-                SELECT 
-                    p.*,
-                    c.nombre as categoria_nombre,
-                    l.nombre as laboratorio_nombre,
-                    (SELECT SUM(stock_actual) FROM lotes WHERE producto_id = p.id) as stock_total
-                FROM productos p
-                LEFT JOIN categorias c ON p.categoria_id = c.id
-                LEFT JOIN laboratorios l ON p.laboratorio_id = l.id
-                WHERE p.codigo_barras = ? AND p.estado = 'activo'
-            `;
-            const producto = await this.db.get<any>(sql, [codigoBarras]);
-            if (!producto) return null;
-            return this.db.toCamelCase(producto) as Producto;
+            // Primero buscar por código de barras en presentaciones
+            const presSql = `SELECT producto_id FROM presentaciones WHERE codigo_barras = ?`;
+            const pres = await this.db.get<any>(presSql, [codigoBarras]);
+            
+            if (pres) {
+                return this.obtenerPorId(pres.producto_id);
+            }
+            return null;
         } catch (err: any) {
             console.error('Error buscando producto por código de barras:', err);
             throw err;
@@ -110,21 +128,34 @@ export class ProductosService {
     async buscar(termino: string): Promise<Producto[]> {
         try {
             const sql = `
-                SELECT 
+                SELECT DISTINCT
                     p.*,
                     c.nombre as categoria_nombre,
-                    l.nombre as laboratorio_nombre,
-                    (SELECT SUM(stock_actual) FROM lotes WHERE producto_id = p.id) as stock_total
+                    l.nombre as laboratorio_nombre
                 FROM productos p
                 LEFT JOIN categorias c ON p.categoria_id = c.id
                 LEFT JOIN laboratorios l ON p.laboratorio_id = l.id
+                LEFT JOIN presentaciones pres ON p.id = pres.producto_id
                 WHERE p.estado = 'activo' 
-                AND (p.nombre_comercial LIKE ? OR p.codigo_barras LIKE ? OR p.principio_activo LIKE ?)
+                AND (p.nombre_comercial LIKE ? OR p.principio_activo LIKE ? OR pres.codigo_barras LIKE ?)
                 ORDER BY p.nombre_comercial ASC
             `;
             const searchTerm = `%${termino}%`;
             const result = await this.db.query<any>(sql, [searchTerm, searchTerm, searchTerm]);
-            return this.db.toCamelCase(result) as Producto[];
+            const productos = this.db.toCamelCase(result) as Producto[];
+
+            for (const prod of productos) {
+                const presSql = `
+                    SELECT pres.*, 
+                    (SELECT SUM(stock_actual) FROM lotes WHERE presentacion_id = pres.id) as stock_total
+                    FROM presentaciones pres 
+                    WHERE pres.producto_id = ?
+                `;
+                const presResult = await this.db.query<any>(presSql, [prod.id]);
+                prod.presentaciones = this.db.toCamelCase(presResult) as Presentacion[];
+            }
+
+            return productos;
         } catch (err: any) {
             console.error('Error buscando productos:', err);
             throw err;
@@ -135,29 +166,50 @@ export class ProductosService {
         try {
             const sql = `
                 INSERT INTO productos (
-                    codigo_barras, codigo_interno, nombre_comercial, principio_activo,
-                    presentacion, laboratorio_id, categoria_id, precio_venta, stock_minimo,
-                    requiere_receta, es_controlado, estado
+                    codigo_interno, nombre_comercial, principio_activo,
+                    laboratorio_id, categoria_id, requiere_receta, es_controlado, estado
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo')
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'activo')
             `;
 
             const result = await this.db.run(sql, [
-                producto.codigoBarras || null,
                 producto.codigoInterno || null,
                 producto.nombreComercial,
                 producto.principioActivo || null,
-                producto.presentacion || null,
                 producto.laboratorioId || null,
                 producto.categoriaId,
-                producto.precioVenta || 0,
-                producto.stockMinimo || 0,
                 producto.requiereReceta ? 1 : 0,
                 producto.esControlado ? 1 : 0
             ]);
 
+            const productoId = result.lastInsertRowid;
+
+            // Crear presentaciones
+            if (producto.presentaciones) {
+                for (const pres of producto.presentaciones) {
+                    await this.db.run(`
+                        INSERT INTO presentaciones (
+                            producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                            precio_compra_caja, precio_venta_unidad, precio_venta_caja, 
+                            stock_minimo, codigo_barras, vencimiento_predeterminado_meses
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `, [
+                        productoId,
+                        pres.nombreDescriptivo,
+                        pres.unidadBase,
+                        pres.unidadesPorCaja,
+                        pres.precioCompraCaja || 0,
+                        pres.precioVentaUnidad,
+                        pres.precioVentaCaja,
+                        pres.stockMinimo,
+                        pres.codigoBarras || null,
+                        pres.vencimientoPredeterminadoMeses || 0
+                    ]);
+                }
+            }
+
             await this.cargarProductos();
-            return result.lastInsertRowid;
+            return productoId;
         } catch (err: any) {
             console.error('Error creando producto:', err);
             throw err;
@@ -168,27 +220,69 @@ export class ProductosService {
         try {
             const sql = `
                 UPDATE productos 
-                SET codigo_barras = ?, codigo_interno = ?, nombre_comercial = ?, 
-                    principio_activo = ?, presentacion = ?, laboratorio_id = ?, 
-                    categoria_id = ?, precio_venta = ?, stock_minimo = ?, 
-                    requiere_receta = ?, es_controlado = ?
+                SET codigo_interno = ?, nombre_comercial = ?, 
+                    principio_activo = ?, laboratorio_id = ?, 
+                    categoria_id = ?, requiere_receta = ?, es_controlado = ?
                 WHERE id = ?
             `;
 
             await this.db.run(sql, [
-                producto.codigoBarras || null,
                 producto.codigoInterno || null,
                 producto.nombreComercial,
                 producto.principioActivo || null,
-                producto.presentacion || null,
                 producto.laboratorioId || null,
                 producto.categoriaId,
-                producto.precioVenta || 0,
-                producto.stockMinimo || 0,
                 producto.requiereReceta ? 1 : 0,
                 producto.esControlado ? 1 : 0,
                 id
             ]);
+
+            // Actualizar presentaciones (Estrategia simple: borrar y reinsertar)
+            if (producto.presentaciones) {
+                // Primero obtener IDs existentes para no romper lotes si es posible, 
+                // pero por simplicidad de este rediseño, borraremos y reinsertaremos.
+                // NOTA: En un sistema real esto debe ser un UPSERT para no perder la relación con lotes existentes.
+                // Implementaremos un UPSERT manual básico.
+                
+                const existingPres = await this.db.query<any>(`SELECT id FROM presentaciones WHERE producto_id = ?`, [id]);
+                const incomingIds = producto.presentaciones.filter(p => p.id).map(p => p.id);
+                
+                // Borrar las que ya no vienen
+                for (const ex of existingPres) {
+                    if (!incomingIds.includes(ex.id)) {
+                        await this.db.run(`DELETE FROM presentaciones WHERE id = ?`, [ex.id]);
+                    }
+                }
+
+                for (const pres of producto.presentaciones) {
+                    if (pres.id) {
+                        await this.db.run(`
+                            UPDATE presentaciones SET
+                                nombre_descriptivo = ?, unidad_base = ?, unidades_por_caja = ?,
+                                precio_compra_caja = ?, precio_venta_unidad = ?, precio_venta_caja = ?, 
+                                stock_minimo = ?, codigo_barras = ?, vencimiento_predeterminado_meses = ?
+                            WHERE id = ?
+                        `, [
+                            pres.nombreDescriptivo, pres.unidadBase, pres.unidadesPorCaja,
+                            pres.precioCompraCaja || 0, pres.precioVentaUnidad, pres.precioVentaCaja, 
+                            pres.stockMinimo, pres.codigoBarras || null, 
+                            pres.vencimientoPredeterminadoMeses || 0, pres.id
+                        ]);
+                    } else {
+                        await this.db.run(`
+                            INSERT INTO presentaciones (
+                                producto_id, nombre_descriptivo, unidad_base, unidades_por_caja,
+                                precio_compra_caja, precio_venta_unidad, precio_venta_caja, 
+                                stock_minimo, codigo_barras, vencimiento_predeterminado_meses
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `, [
+                            id, pres.nombreDescriptivo, pres.unidadBase, pres.unidadesPorCaja,
+                            pres.precioCompraCaja || 0, pres.precioVentaUnidad, pres.precioVentaCaja, 
+                            pres.stockMinimo, pres.codigoBarras || null, pres.vencimientoPredeterminadoMeses || 0
+                        ]);
+                    }
+                }
+            }
 
             await this.cargarProductos();
         } catch (err: any) {
@@ -199,11 +293,20 @@ export class ProductosService {
 
     async eliminar(id: number): Promise<void> {
         try {
-            const sql = `UPDATE productos SET estado = 'inactivo' WHERE id = ?`;
-            await this.db.run(sql, [id]);
-            await this.cargarProductos();
+            await this.cambiarEstado(id, EstadoRegistro.INACTIVO);
         } catch (err: any) {
             console.error('Error eliminando producto:', err);
+            throw err;
+        }
+    }
+
+    async cambiarEstado(id: number, estado: EstadoRegistro): Promise<void> {
+        try {
+            const sql = `UPDATE productos SET estado = ? WHERE id = ?`;
+            await this.db.run(sql, [estado, id]);
+            await this.cargarProductos();
+        } catch (err: any) {
+            console.error('Error cambiando estado del producto:', err);
             throw err;
         }
     }
@@ -220,23 +323,22 @@ export class ProductosService {
 
             const sqlStockBajo = `
                 SELECT COUNT(*) as count FROM (
-                    SELECT p.id
-                    FROM productos p
-                    LEFT JOIN lotes l ON p.id = l.producto_id
-                    WHERE p.estado = 'activo'
-                    GROUP BY p.id
-                    HAVING SUM(COALESCE(l.stock_actual, 0)) <= p.stock_minimo
+                    SELECT pres.id
+                    FROM presentaciones pres
+                    LEFT JOIN lotes l ON pres.id = l.presentacion_id
+                    GROUP BY pres.id
+                    HAVING SUM(COALESCE(l.stock_actual, 0)) <= pres.stock_minimo
+                    AND SUM(COALESCE(l.stock_actual, 0)) > 0
                 )
             `;
             const stockBajo = (await this.db.get<any>(sqlStockBajo)).count;
 
             const sqlSinStock = `
                 SELECT COUNT(*) as count FROM (
-                    SELECT p.id
-                    FROM productos p
-                    LEFT JOIN lotes l ON p.id = l.producto_id
-                    WHERE p.estado = 'activo'
-                    GROUP BY p.id
+                    SELECT pres.id
+                    FROM presentaciones pres
+                    LEFT JOIN lotes l ON pres.id = l.presentacion_id
+                    GROUP BY pres.id
                     HAVING SUM(COALESCE(l.stock_actual, 0)) = 0
                 )
             `;
@@ -260,5 +362,14 @@ export class ProductosService {
             console.error('Error obteniendo estadísticas:', err);
             return { total: 0, stockBajo: 0, sinStock: 0, vencimientosProximos: 0 };
         }
+    }
+
+    /**
+     * Calcula la fecha de vencimiento sugerida basada en los meses predeterminados
+     */
+    sugerirFechaVencimiento(meses: number): string {
+        const fecha = new Date();
+        fecha.setMonth(fecha.getMonth() + (meses || 24)); // 24 meses por defecto si es 0
+        return fecha.toISOString().split('T')[0];
     }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ProductosService } from '../../services/productos.service';
@@ -29,7 +29,17 @@ export class LotesListComponent implements OnInit {
     lotes = signal<Lote[]>([]);
     loading = signal(true);
 
+    totalStockConsolidado = computed(() => {
+        const lotes = this.lotes();
+        return lotes.reduce((acc, l) => acc + (l.stockActual || 0), 0);
+    });
+
     columns: TableColumn<Lote>[] = [
+        {
+            key: 'presentacionNombre',
+            label: 'Presentación',
+            render: (row) => `<span class="text-xs font-bold text-primary-600">${row.presentacionNombre || 'Genérica'}</span>`
+        },
         {
             key: 'lote',
             label: 'Nº de Lote',
@@ -44,14 +54,14 @@ export class LotesListComponent implements OnInit {
         },
         {
             key: 'stockActual',
-            label: 'Stock Actual',
+            label: 'Stock (Unidades)',
             sortable: true,
             render: (row) => `<span class="text-lg font-black ${row.stockActual > 0 ? 'text-primary-700' : 'text-gray-400'}">${row.stockActual}</span>`
         },
         {
-            key: 'ubicacion',
-            label: 'Ubicación',
-            render: (row) => row.ubicacion || '<span class="text-gray-300 italic">No definida</span>'
+            key: 'precioCompraCaja',
+            label: 'Costo Caja',
+            render: (row) => `<span class="text-xs font-bold text-slate-500">$${row.precioCompraCaja.toFixed(2)}</span>`
         },
         {
             key: 'fechaIngreso',
@@ -74,10 +84,20 @@ export class LotesListComponent implements OnInit {
         this.loading.set(true);
         try {
             const prod = await this.productosService.obtenerPorId(id);
-            if (prod) {
+            if (prod && prod.presentaciones) {
                 this.producto.set(prod);
-                const list = await this.productosService.obtenerLotes(id);
-                this.lotes.set(list);
+                const allLotes: Lote[] = [];
+                
+                for (const pres of prod.presentaciones) {
+                    const list = await this.productosService.obtenerLotes(pres.id!);
+                    list.forEach(l => {
+                        l.presentacionNombre = pres.nombreDescriptivo;
+                        l.productoNombre = prod.nombreComercial;
+                    });
+                    allLotes.push(...list);
+                }
+                
+                this.lotes.set(allLotes);
             } else {
                 this.volver();
             }
@@ -107,5 +127,11 @@ export class LotesListComponent implements OnInit {
         this.router.navigate(['/productos']);
     }
 }
+
+
+
+
+
+
 
 

@@ -59,7 +59,7 @@ export class ButtonComponent {
     }
 
     get buttonClasses(): string {
-        const baseClasses = 'inline-flex items-center justify-center font-bold rounded-2xl transition-all duration-500 focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed border-0';
+        const baseClasses = 'inline-flex items-center justify-center font-bold rounded-lg transition-all duration-500 focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed border-0';
 
         const variantClasses = {
             primary: 'bg-primary-600 text-white hover:bg-primary-700 hover:shadow-premium-hover hover:-translate-y-1 focus:ring-primary-500/20 shadow-premium',

@@ -12,6 +12,7 @@ export enum EstadoRegistro {
 }
 
 export enum EstadoOrdenCompra {
+    BORRADOR = 'borrador',
     PENDIENTE = 'pendiente',
     APROBADA = 'aprobada',
     RECIBIDA = 'recibida',
@@ -101,37 +102,54 @@ export interface Usuario {
 }
 
 /**
- * Producto farmacéutico (Catálogo Maestro)
+ * Producto farmacéutico (Catálogo Maestro Genérico)
  */
 export interface Producto {
     id?: number;
-    codigoBarras?: string;
     codigoInterno?: string;
     nombreComercial: string;
     principioActivo?: string;
-    presentacion?: string;
     laboratorioId?: number;
     laboratorioNombre?: string; // Virtual
     categoriaId: number;
     categoriaNombre?: string; // Virtual
-    precioVenta: number;
-    stockMinimo: number;
     requiereReceta: boolean;
     esControlado: boolean;
     estado: EstadoRegistro;
+    presentaciones?: Presentacion[]; // Virtual
+}
+
+/**
+ * Presentación de Producto (Cómo se empaqueta y vende)
+ */
+export interface Presentacion {
+    id?: number;
+    productoId: number;
+    nombreDescriptivo: string; // Ej: "Caja x 100 tabletas"
+    unidadBase: string;        // Ej: "tableta"
+    unidadesPorCaja: number;
+    precioCompraCaja: number;
+    precioVentaUnidad: number;
+    precioVentaCaja: number;
+    stockMinimo: number;
+    codigoBarras?: string;
+    vencimientoPredeterminadoMeses?: number;
     stockTotal?: number; // Virtual (suma de lotes)
 }
 
 /**
- * Lote de productos (Inventario Real)
+ * Lote de productos (Inventario Real por Presentación)
  */
 export interface Lote {
     id?: number;
-    productoId: number;
+    presentacionId: number;
+    presentacionNombre?: string; // Virtual
     productoNombre?: string; // Virtual
     lote: string;
     fechaVencimiento: string;
-    stockActual: number;
+    stockActual: number; // En unidades base
+    precioCompraCaja: number;
+    precioCompraUnitario: number;
     ubicacion?: string;
     fechaIngreso?: string;
 }
@@ -165,13 +183,14 @@ export interface OrdenCompra {
 export interface DetalleOrdenCompra {
     id?: number;
     ordenCompraId: number;
-    productoId: number;
+    presentacionId: number;
+    presentacionNombre?: string; // Virtual
     productoNombre?: string; // Virtual
-    cantidad: number;
-    precioUnitario: number;
+    cantidad: number; // En CAJAS
+    precioUnitario: number; // Por CAJA
     subtotal: number;
-    lote: string;
-    fechaVencimiento: string;
+    lote?: string;
+    fechaVencimiento?: string;
 }
 
 /**
@@ -198,6 +217,7 @@ export interface DetalleVenta {
     id?: number;
     ventaId?: number;
     loteId: number;
+    presentacionId?: number; // Virtual/Referencia
     loteCodigo?: string; // Virtual
     productoNombre?: string; // Virtual
     cantidad: number;

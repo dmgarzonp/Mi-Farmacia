@@ -1,5 +1,5 @@
 <div class="max-w-4xl mx-auto space-y-6 pb-12">
-  <div class="flex items-center justify-between animate-fade-in">
+  <div *ngIf="!isModalMode" class="flex items-center justify-between animate-fade-in">
     <div>
       <h1 class="text-3xl font-black text-gray-900 tracking-tight">
         {{ isEditMode ? 'Editar' : 'Nuevo' }} Proveedor
@@ -17,17 +17,47 @@
     <!-- Decoración de fondo -->
     <div class="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
     
+    <!-- Navegación por pestañas -->
+    <div class="flex items-center gap-2 mb-10 bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 relative z-10 w-fit">
+      <button 
+        type="button"
+        (click)="activeTab.set('empresa')"
+        [class.bg-white]="activeTab() === 'empresa'"
+        [class.text-primary-600]="activeTab() === 'empresa'"
+        [class.shadow-md]="activeTab() === 'empresa'"
+        [class.border-gray-100]="activeTab() === 'empresa'"
+        [class.text-gray-400]="activeTab() !== 'empresa'"
+        class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-transparent hover:text-primary-500"
+      >
+        <span class="w-4 h-4 block" [innerHTML]="icons.TRUCK | safeHtml"></span>
+        Información Empresa
+      </button>
+      <button 
+        type="button"
+        (click)="activeTab.set('contacto')"
+        [class.bg-white]="activeTab() === 'contacto'"
+        [class.text-emerald-600]="activeTab() === 'contacto'"
+        [class.shadow-md]="activeTab() === 'contacto'"
+        [class.border-gray-100]="activeTab() === 'contacto'"
+        [class.text-gray-400]="activeTab() !== 'contacto'"
+        class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-transparent hover:text-emerald-500"
+      >
+        <span class="w-4 h-4 block" [innerHTML]="icons.USERS | safeHtml"></span>
+        Persona de Contacto
+      </button>
+    </div>
+    
     <form [formGroup]="form" (ngSubmit)="guardar()" class="space-y-12 relative z-10">
       
-      <!-- Sección: Información de la Empresa -->
-      <div class="space-y-8">
+      <!-- Pestaña: Información de la Empresa -->
+      <div *ngIf="activeTab() === 'empresa'" class="space-y-8 animate-fade-in">
         <div class="flex items-center gap-4">
           <div class="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600">
-            <span class="w-6 h-6 block" [innerHTML]="proveedoresService.icons.TRUCK | safeHtml"></span>
+            <span class="w-6 h-6 block" [innerHTML]="icons.TRUCK | safeHtml"></span>
           </div>
           <div>
-            <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest">Información de la Empresa</h3>
-            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Datos fiscales y de contacto corporativo</p>
+            <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest">Datos Corporativos</h3>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Identificación fiscal y ubicación principal</p>
           </div>
         </div>
 
@@ -77,15 +107,15 @@
         </div>
       </div>
 
-      <!-- Sección: Información del Contacto -->
-      <div class="space-y-8 pt-6">
+      <!-- Pestaña: Información del Contacto -->
+      <div *ngIf="activeTab() === 'contacto'" class="space-y-8 animate-fade-in">
         <div class="flex items-center gap-4">
           <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-            <span class="w-6 h-6 block" [innerHTML]="proveedoresService.icons.USERS | safeHtml"></span>
+            <span class="w-6 h-6 block" [innerHTML]="icons.USERS | safeHtml"></span>
           </div>
           <div>
-            <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest">Persona de Contacto</h3>
-            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Representante o ejecutivo asignado</p>
+            <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest">Ejecutivo Asignado</h3>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Persona responsable de la atención directa</p>
           </div>
         </div>
 
@@ -124,7 +154,7 @@
 
       <div class="flex justify-end gap-4 pt-10 border-t border-gray-100">
         <app-button type="button" variant="secondary" (clicked)="volver()" iconNameLeft="CANCEL">
-          Descartar Cambios
+          Descartar
         </app-button>
         <app-button type="submit" variant="primary" [disabled]="form.invalid || guardando" iconNameLeft="SAVE" class="min-w-[200px] shadow-lg shadow-primary-500/20">
           {{ guardando ? 'Guardando...' : (isEditMode ? 'Actualizar Información' : 'Registrar Proveedor') }}

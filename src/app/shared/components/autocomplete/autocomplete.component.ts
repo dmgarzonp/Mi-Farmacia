@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, forwardRef, signal, computed, ElementRef, ViewChild, HostListener } from '@angular/core';
+import { Component, Input, Output, EventEmitter, forwardRef, signal, computed, ElementRef, ViewChild, HostListener, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/forms';
 import { APP_ICONS } from '../../../core/constants/icons';
@@ -44,7 +44,7 @@ interface AutocompleteItem {
             (focus)="onFocus()"
             [disabled]="disabled"
             [class.pl-10]="iconName"
-            class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+            class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm placeholder:text-gray-400"
             [class.border-red-300]="hasError"
           />
           
@@ -64,20 +64,20 @@ interface AutocompleteItem {
 
         <!-- Dropdown Results -->
         <div *ngIf="isOpen() && filteredItems().length > 0" 
-             class="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-premium border border-gray-100 max-h-60 overflow-y-auto overflow-x-hidden animate-slide-up"
+             class="absolute z-[100] w-full mt-2 bg-white rounded-lg shadow-2xl border border-slate-200 max-h-80 overflow-y-auto overflow-x-hidden animate-slide-up"
         >
-          <div class="p-1">
+          <div class="p-1.5">
             <button
               *ngFor="let item of filteredItems(); let i = index"
               type="button"
               (click)="selectItem(item)"
-              class="w-full text-left px-4 py-3 rounded-xl hover:bg-primary-50 transition-all group flex flex-col"
-              [class.bg-primary-50]="selectedValue?.id === item.id"
+              class="w-full text-left px-4 py-3 rounded-lg hover:bg-emerald-50 transition-all group flex flex-col"
+              [class.bg-emerald-50]="selectedValue?.id === item.id"
             >
-              <span class="text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition-colors">
+              <span class="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
                 {{ item.label }}
               </span>
-              <span *ngIf="item.sublabel" class="text-[10px] text-gray-400 group-hover:text-primary-500 transition-colors uppercase font-medium tracking-wider">
+              <span *ngIf="item.sublabel" class="text-[10px] text-slate-400 group-hover:text-emerald-600 transition-colors uppercase font-black tracking-widest mt-0.5">
                 {{ item.sublabel }}
               </span>
             </button>
@@ -86,11 +86,11 @@ interface AutocompleteItem {
 
         <!-- No results -->
         <div *ngIf="isOpen() && searchQuery() !== '' && filteredItems().length === 0" 
-             class="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-premium border border-gray-100 p-6 text-center animate-slide-up"
+             class="absolute z-[100] w-full mt-2 bg-white rounded-lg shadow-2xl border border-slate-200 p-8 text-center animate-slide-up"
         >
-          <div class="flex flex-col items-center gap-2">
-            <span class="w-8 h-8 text-gray-200" [innerHTML]="icons.SEARCH | safeHtml"></span>
-            <p class="text-xs text-gray-400 italic font-medium">No se encontraron resultados</p>
+          <div class="flex flex-col items-center gap-3">
+            <span class="w-10 h-10 text-slate-200" [innerHTML]="icons.SEARCH | safeHtml"></span>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Sin coincidencias</p>
           </div>
         </div>
       </div>
@@ -100,13 +100,14 @@ interface AutocompleteItem {
     :host { display: block; }
   `]
 })
-export class AutocompleteComponent implements ControlValueAccessor {
+export class AutocompleteComponent implements ControlValueAccessor, OnChanges {
   @Input() label?: string;
   @Input() placeholder = 'Buscar...';
   @Input() required = false;
   @Input() items: AutocompleteItem[] = [];
   @Input() iconName?: keyof typeof APP_ICONS;
   @Input() hasError = false;
+  @Input() autoClear = false;
   
   @Output() itemSelected = new EventEmitter<AutocompleteItem>();
 
@@ -116,20 +117,29 @@ export class AutocompleteComponent implements ControlValueAccessor {
   icons = APP_ICONS;
   isOpen = signal(false);
   searchQuery = signal('');
+  itemsSignal = signal<AutocompleteItem[]>([]);
   disabled = false;
   value: any = null;
   selectedValue: AutocompleteItem | null = null;
 
   filteredItems = computed(() => {
     const query = this.searchQuery().toLowerCase();
-    if (!query && !this.isOpen()) return [];
-    if (!query) return this.items.slice(0, 10);
+    const allItems = this.itemsSignal();
     
-    return this.items.filter(item => 
+    if (!query && !this.isOpen()) return [];
+    if (!query) return allItems.slice(0, 10);
+    
+    return allItems.filter(item => 
       item.label.toLowerCase().includes(query) || 
       (item.sublabel && item.sublabel.toLowerCase().includes(query))
     ).slice(0, 10);
   });
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['items']) {
+      this.itemsSignal.set(this.items || []);
+    }
+  }
 
   private onChange: any = () => {};
   private onTouched: any = () => {};
@@ -158,6 +168,13 @@ export class AutocompleteComponent implements ControlValueAccessor {
   }
 
   selectItem(item: AutocompleteItem): void {
+    if (this.autoClear) {
+      this.searchQuery.set('');
+      this.isOpen.set(false);
+      this.itemSelected.emit(item);
+      return;
+    }
+
     this.selectedValue = item;
     this.value = item.id;
     this.searchQuery.set(item.label);

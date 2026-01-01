@@ -61,12 +61,41 @@
         @apply border-gray-200;
     }
 
+    /* Personalización de Scrollbars para un ERP Moderno */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #cbd5e1; /* slate-300 */
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8; /* slate-400 */
+    }
+
     body {
         background-color: var(--background);
         background-image: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.03) 0px, transparent 50%),
                           radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.03) 0px, transparent 50%);
         color: var(--foreground);
-        @apply font-sans antialiased min-h-screen;
+        @apply font-sans antialiased;
+        overflow: hidden !important;
+        height: 100vh !important;
+        width: 100vw !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    html {
+        overflow: hidden !important;
+        height: 100% !important;
     }
 
     h1,
