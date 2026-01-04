@@ -10,6 +10,8 @@ declare global {
             dbRun: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
             dbGet: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
             getLocale: () => Promise<string>;
+            login: (credentials: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+            hashPassword: (password: string) => Promise<string>;
         };
     }
 }
@@ -88,6 +90,20 @@ export class DatabaseService {
             console.error('Database get exception:', error);
             throw error;
         }
+    }
+
+    /**
+     * Intenta iniciar sesión con las credenciales proporcionadas
+     */
+    async login(credentials: any): Promise<{ success: boolean; data?: any; error?: string }> {
+        return await window.electronAPI.login(credentials);
+    }
+
+    /**
+     * Genera un hash seguro para una contraseña
+     */
+    async hashPassword(password: string): Promise<string> {
+        return await window.electronAPI.hashPassword(password);
     }
 
     /**

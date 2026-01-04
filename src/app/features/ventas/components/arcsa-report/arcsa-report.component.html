@@ -1,0 +1,48 @@
+<div class="h-full flex flex-col gap-6 animate-fade-in pb-8">
+  <!-- Header de Reportes -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-8 rounded-[2.5rem] shadow-premium flex items-center justify-between">
+    <div class="flex items-center gap-6">
+      <div class="w-16 h-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-100">
+        <span class="w-8 h-8" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight uppercase">Reporte ARCSA</h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Control de Psicotrópicos y Antibióticos Bajo Receta</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <app-button variant="secondary" (clicked)="exportarPdf()" iconNameLeft="VIEW">Exportar PDF</app-button>
+      <app-button variant="success" (clicked)="exportarExcel()" iconNameLeft="SAVE">Exportar Excel</app-button>
+    </div>
+  </div>
+
+  <!-- Filtros Rápidos -->
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium flex flex-wrap items-end gap-6">
+    <div class="w-48">
+      <app-input label="Fecha Inicio" type="date" [(ngModel)]="filtros.inicio" (ngModelChange)="cargarDatos()"></app-input>
+    </div>
+    <div class="w-48">
+      <app-input label="Fecha Fin" type="date" [(ngModel)]="filtros.fin" (ngModelChange)="cargarDatos()"></app-input>
+    </div>
+    
+    <div class="flex-1 flex justify-end">
+      <div class="flex items-center gap-4 px-6 py-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+        <div class="flex flex-col items-end">
+          <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Total Recetas en Periodo</span>
+          <span class="text-xl font-black text-indigo-600">{{ recetas().length }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de Resultados -->
+  <div class="flex-1 min-h-0">
+    <app-table
+      [columns]="columns"
+      [data]="recetas()"
+      [loading]="loading()"
+    ></app-table>
+  </div>
+</div>
+

@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
 import { DatabaseService } from '../../../core/services/database.service';
 import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, TipoMovimiento } from '../../../core/models';
+import { AuthService } from '../../../core/services/auth.service';
 
 /**
  * Servicio para gestión de órdenes de compra
@@ -10,11 +11,12 @@ import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, TipoMovimiento } fr
     providedIn: 'root'
 })
 export class ComprasService {
+    private db = inject(DatabaseService);
+    private authService = inject(AuthService);
+    
     ordenes = signal<OrdenCompra[]>([]);
     loading = signal<boolean>(false);
     error = signal<string | null>(null);
-
-    constructor(private db: DatabaseService) { }
 
     async cargarOrdenes(): Promise<void> {
         this.loading.set(true);
@@ -83,12 +85,13 @@ export class ComprasService {
         }
 
         try {
+            const usuarioId = this.authService.usuarioActual()?.id || null;
             const ordenSql = `
                 INSERT INTO ordenes_compra (
                     proveedor_id, fecha_emision, estado, subtotal, 
-                    descuento_monto, impuesto_total, total, moneda, observaciones
+                    descuento_monto, impuesto_total, total, moneda, observaciones, creado_por
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const result = await this.db.run(ordenSql, [
@@ -100,7 +103,8 @@ export class ComprasService {
                 Number(orden.impuestoTotal) || 0,
                 Number(orden.total) || 0,
                 orden.moneda || 'USD',
-                orden.observaciones || null
+                orden.observaciones || null,
+                usuarioId
             ]);
 
             const ordenId = result.lastInsertRowid;
@@ -252,6 +256,8 @@ export class ComprasService {
             const orden = await this.obtenerPorId(id);
             if (!orden || !orden.detalles) throw new Error('Orden no encontrada');
 
+            const usuarioId = this.authService.usuarioActual()?.id || null;
+
             // 1. Actualizar detalles de la orden con datos reales de recepción
             const updateDetSql = `
                 UPDATE ordenes_compra_detalles 
@@ -272,11 +278,14 @@ export class ComprasService {
                 ]);
             }
 
-            // 2. Actualizar total de la orden si cambió
-            if (nuevoTotal !== undefined) {
-                const updateOrdenSql = `UPDATE ordenes_compra SET subtotal = ?, total = ? WHERE id = ?`;
-                await this.db.run(updateOrdenSql, [nuevoTotal, nuevoTotal, id]);
-            }
+            // 2. Actualizar total de la orden si cambió y marcar como aprobada por el usuario actual
+            const updateOrdenSql = `UPDATE ordenes_compra SET subtotal = ?, total = ?, aprobado_por = ? WHERE id = ?`;
+            await this.db.run(updateOrdenSql, [
+                nuevoTotal !== undefined ? nuevoTotal : orden.total, 
+                nuevoTotal !== undefined ? nuevoTotal : orden.total, 
+                usuarioId,
+                id
+            ]);
 
             // 3. Procesar inventario para cada presentación
             for (const det of detallesActualizados) {
@@ -317,17 +326,18 @@ export class ComprasService {
                     loteId = resLote.lastInsertRowid;
                 }
 
-                // Registrar Movimiento de Stock
+                // Registrar Movimiento de Stock con Usuario
                 const sqlMov = `
-                    INSERT INTO movimientos_stock (tipo, lote_id, cantidad, documento_referencia, observaciones)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO movimientos_stock (tipo, lote_id, cantidad, documento_referencia, observaciones, usuario_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 `;
                 await this.db.run(sqlMov, [
                     TipoMovimiento.ENTRADA_COMPRA,
                     loteId,
                     cantidadTotalUnidades,
                     `OC-${id}`,
-                    `Recepción de OC #${id} (${det.cantidad} CAJAS x ${unidadesPorCaja} unid.)`
+                    `Recepción de OC #${id} (${det.cantidad} CAJAS x ${unidadesPorCaja} unid.)`,
+                    usuarioId
                 ]);
             }
 

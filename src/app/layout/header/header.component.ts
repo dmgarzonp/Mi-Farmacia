@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
+import { AuthService } from '../../core/services/auth.service';
 
 /**
  * Componente de header/barra superior moderno
@@ -14,6 +15,7 @@ import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
     styles: []
 })
 export class HeaderComponent {
+    authService = inject(AuthService);
     title = 'Mi Farmacia';
     icons = APP_ICONS;
 

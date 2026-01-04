@@ -4,18 +4,22 @@ import { Injectable, signal } from '@angular/core';
   providedIn: 'root'
 })
 export class PersistenceService {
-  private storage = new Map<string, any>();
-
   set(key: string, value: any): void {
-    this.storage.set(key, value);
+    localStorage.setItem(key, JSON.stringify(value));
   }
 
   get<T>(key: string): T | undefined {
-    return this.storage.get(key) as T;
+    const data = localStorage.getItem(key);
+    if (!data) return undefined;
+    try {
+      return JSON.parse(data) as T;
+    } catch (e) {
+      return undefined;
+    }
   }
 
-  clear(key: string): void {
-    this.storage.delete(key);
+  remove(key: string): void {
+    localStorage.removeItem(key);
   }
 }
 

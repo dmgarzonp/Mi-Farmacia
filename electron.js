@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 const initialData = require('./database/initial-data');
 const sriLogic = require('./sri-logic');
 
@@ -68,6 +69,8 @@ function createTables() {
     CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
       rol TEXT NOT NULL CHECK(rol IN ('administrador', 'farmaceutico', 'cajero', 'almacen')),
       estado TEXT DEFAULT 'activo' CHECK(estado IN ('activo', 'inactivo'))
     );
@@ -193,6 +196,8 @@ function createTables() {
       venta_id INTEGER NOT NULL,
       cliente_id INTEGER,
       medico_nombre TEXT,
+      medico_registro TEXT,
+      receta_numero TEXT,
       fecha_emision DATE,
       observaciones TEXT,
       estado TEXT DEFAULT 'validada' CHECK(estado IN ('validada', 'rechazada', 'pendiente')),
@@ -271,6 +276,47 @@ function createTables() {
         }
     } catch (e) {
         console.error('Error ensuring tarifa_iva column in productos:', e);
+    }
+
+    // Asegurar columna es_fraccion en ventas_detalles (Venta Fraccionada)
+    try {
+        const tableInfoVDet = db.prepare("PRAGMA table_info(ventas_detalles)").all();
+        if (!tableInfoVDet.some(col => col.name === 'es_fraccion')) {
+            console.log('Adding es_fraccion column to ventas_detalles...');
+            db.exec('ALTER TABLE ventas_detalles ADD COLUMN es_fraccion INTEGER DEFAULT 0;');
+        }
+    } catch (e) {
+        console.error('Error ensuring es_fraccion column in ventas_detalles:', e);
+    }
+
+    // Asegurar columnas en recetas (ARCSA / Controlados)
+    try {
+        const tableInfoRec = db.prepare("PRAGMA table_info(recetas)").all();
+        if (!tableInfoRec.some(col => col.name === 'medico_registro')) {
+            console.log('Adding medico_registro and receta_numero to recetas...');
+            db.exec('ALTER TABLE recetas ADD COLUMN medico_registro TEXT;');
+            db.exec('ALTER TABLE recetas ADD COLUMN receta_numero TEXT;');
+        }
+    } catch (e) {
+        console.error('Error ensuring columns in recetas:', e);
+    }
+
+    // Asegurar columnas de autenticación en usuarios
+    try {
+        const tableInfoUsers = db.prepare("PRAGMA table_info(usuarios)").all();
+        if (!tableInfoUsers.some(col => col.name === 'username')) {
+            console.log('Adding auth columns to usuarios...');
+            db.exec(`
+                ALTER TABLE usuarios ADD COLUMN username TEXT;
+                ALTER TABLE usuarios ADD COLUMN password TEXT;
+            `);
+            // Actualizar usuarios existentes con valores por defecto
+            db.exec(`
+                UPDATE usuarios SET username = LOWER(REPLACE(nombre, ' ', '.')), password = '123' WHERE username IS NULL;
+            `);
+        }
+    } catch (e) {
+        console.error('Error ensuring auth columns in usuarios:', e);
     }
 
     db.exec(schema);
@@ -369,15 +415,30 @@ function seedInitialData() {
             }
         });
         seedProds(initialData.PRODUCTOS);
+    }
 
-        // 5. Usuarios iniciales
-        const insertUsuario = db.prepare('INSERT INTO usuarios (nombre, rol) VALUES (?, ?)');
-        insertUsuario.run('Admin Sistema', 'administrador');
-        insertUsuario.run('Juan Farmacéutico', 'farmaceutico');
+    // 5. Usuarios iniciales con contraseña segura si no hay ninguno o si no existe admin
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM usuarios').get();
+    const adminExists = db.prepare('SELECT COUNT(*) as count FROM usuarios WHERE username = ?').get('admin');
 
-        console.log('Initial data seeded successfully with transactions');
+    if (userCount.count === 0 || adminExists.count === 0) {
+        console.log('Ensuring admin user exists...');
+        const salt = bcrypt.genSaltSync(10);
+        const passAdmin = bcrypt.hashSync('admin123', salt);
+
+        if (adminExists.count === 0) {
+            const insertUsuario = db.prepare('INSERT INTO usuarios (nombre, username, password, rol) VALUES (?, ?, ?, ?)');
+            insertUsuario.run('Admin Sistema', 'admin', passAdmin, 'administrador');
+        }
+
+        if (userCount.count === 0) {
+            const passFarm = bcrypt.hashSync('farm123', salt);
+            const insertUsuario = db.prepare('INSERT INTO usuarios (nombre, username, password, rol) VALUES (?, ?, ?, ?)');
+            insertUsuario.run('Juan Farmacéutico', 'juan.farm', passFarm, 'farmaceutico');
+        }
     }
 }
+
 
 /**
  * Crea la ventana principal de Electron
@@ -408,6 +469,19 @@ function createWindow() {
     } else {
         mainWindow.loadFile(path.join(__dirname, 'dist/mi-farmacia/browser/index.html'));
     }
+
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        // Ctrl+Shift+I o F12 para abrir consola
+        if ((input.control && input.shift && input.key.toLowerCase() === 'i') || input.key === 'F12') {
+            mainWindow.webContents.toggleDevTools();
+            event.preventDefault();
+        }
+        // Ctrl+R o F5 para recargar
+        if ((input.control && input.key.toLowerCase() === 'r') || input.key === 'F5') {
+            mainWindow.reload();
+            event.preventDefault();
+        }
+    });
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
@@ -482,6 +556,29 @@ function setupIpcHandlers() {
             console.error('Error SRI Firmar XML:', error);
             return { success: false, error: error.message };
         }
+    });
+
+    // --- AUTENTICACIÓN ---
+    ipcMain.handle('auth:login', async (event, { username, password }) => {
+        try {
+            const user = db.prepare("SELECT * FROM usuarios WHERE username = ? AND estado = 'activo'").get(username);
+            if (!user) return { success: false, error: 'Usuario no encontrado' };
+
+            const validPassword = bcrypt.compareSync(password, user.password);
+            if (!validPassword) return { success: false, error: 'Contraseña incorrecta' };
+
+            // No devolver el password al frontend
+            const { password: _, ...userSafe } = user;
+            return { success: true, data: userSafe };
+        } catch (error) {
+            console.error('Login error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('auth:hash-password', async (event, password) => {
+        const salt = bcrypt.genSaltSync(10);
+        return bcrypt.hashSync(password, salt);
     });
 
     // Control de Ventana (Barra de título personalizada)

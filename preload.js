@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     windowClose: () => ipcRenderer.send('window:close'),
     // System info
     getLocale: () => ipcRenderer.invoke('app:getLocale'),
+    // Auth operations
+    login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
+    hashPassword: (password) => ipcRenderer.invoke('auth:hash-password', password),
 });

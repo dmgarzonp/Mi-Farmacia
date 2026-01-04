@@ -78,6 +78,17 @@
         </li>
         <li>
           <a
+            routerLink="/ventas/reporte-arcsa"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Reporte ARCSA' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Reporte ARCSA</span>
+          </a>
+        </li>
+        <li>
+          <a
             routerLink="/compras"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
@@ -122,7 +133,7 @@
     </div>
 
     <!-- Sección Configuración -->
-    <div>
+    <div *ngIf="authService.esAdmin()">
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
         Ajustes
       </div>
@@ -138,6 +149,17 @@
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Factura Electrónica</span>
           </a>
         </li>
+        <li>
+          <a
+            routerLink="/configuracion/usuarios"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Gestión de Usuarios' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.USERS | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Usuarios y Accesos</span>
+          </a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -145,12 +167,12 @@
   <!-- Footer con Usuario Moderno -->
   <div class="p-6 bg-primary-900/50 border-t border-primary-700/30">
     <div [class]="isCollapsed() ? 'flex justify-center' : 'flex items-center gap-3'">
-      <div class="w-10 h-10 bg-primary-400 text-primary-900 rounded-full flex items-center justify-center font-bold border-2 border-primary-300 shadow-inner">
-        D
+      <div class="w-10 h-10 bg-primary-400 text-primary-900 rounded-full flex items-center justify-center font-bold border-2 border-primary-300 shadow-inner uppercase">
+        {{ authService.usuarioActual()?.nombre?.substring(0, 1) }}
       </div>
       <div [class]="isCollapsed() ? 'hidden' : 'block'">
-        <p class="text-xs font-bold text-white">dmgarzonp</p>
-        <p class="text-[10px] text-primary-300 font-medium">Administrador</p>
+        <p class="text-xs font-bold text-white truncate max-w-[120px]">{{ authService.usuarioActual()?.nombre }}</p>
+        <p class="text-[10px] text-primary-300 font-medium uppercase tracking-widest">{{ authService.usuarioActual()?.rol }}</p>
       </div>
     </div>
   </div>

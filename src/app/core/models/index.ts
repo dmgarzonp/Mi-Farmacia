@@ -97,6 +97,8 @@ export interface Cliente {
 export interface Usuario {
     id?: number;
     nombre: string;
+    username: string;
+    password?: string; // Solo para creación/edición
     rol: RolUsuario;
     estado: EstadoRegistro;
 }
@@ -254,6 +256,7 @@ export interface DetalleVenta {
     cantidad: number;
     precioUnitario: number;
     subtotal: number;
+    esFraccion?: boolean;
 }
 
 /**
@@ -278,6 +281,8 @@ export interface Receta {
     ventaId: number;
     clienteId?: number;
     medicoNombre?: string;
+    medicoRegistro?: string; // Cédula o Registro del médico
+    recetaNumero?: string;   // Número de receta
     fechaEmision?: string;
     observaciones?: string;
     estado: 'validada' | 'rechazada' | 'pendiente';

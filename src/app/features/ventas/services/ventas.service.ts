@@ -1,7 +1,8 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { DatabaseService } from '../../../core/services/database.service';
-import { Venta, DetalleVenta, TipoMovimiento, EstadoVenta, Lote } from '../../../core/models';
+import { Venta, DetalleVenta, TipoMovimiento, EstadoVenta, Lote, Receta } from '../../../core/models';
 import { SriService } from '../../../core/services/sri.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Injectable({
     providedIn: 'root'
@@ -9,6 +10,7 @@ import { SriService } from '../../../core/services/sri.service';
 export class VentasService {
     private db = inject(DatabaseService);
     private sriService = inject(SriService);
+    private authService = inject(AuthService);
     
     ventas = signal<Venta[]>([]);
     loading = signal<boolean>(false);
@@ -78,27 +80,23 @@ export class VentasService {
     }
 
     /**
-     * Registra una venta completa
-     * 1. Genera Clave de Acceso SRI
-     * 2. Inserta en ventas
-     * 3. Inserta detalles
-     * 4. Descuenta stock de lotes
-     * 5. Registra movimientos de stock
+     * Registra una venta completa y opcionalmente una receta médica
      */
-    async registrarVenta(venta: Partial<Venta>): Promise<number> {
+    async registrarVenta(venta: Partial<Venta>, receta?: Partial<Receta>): Promise<number> {
         try {
             // 1. Lógica Fiscal SRI: Generar Clave de Acceso
             const secuencial = await this.obtenerSiguienteSecuencial();
             const fechaActual = new Date();
             const claveAcceso = this.sriService.generarClaveAcceso(fechaActual, '01', secuencial);
 
-            // 2. Cabecera con Clave de Acceso
+            // 2. Cabecera con Clave de Acceso y Usuario
+            const usuarioId = this.authService.usuarioActual()?.id || null;
             const sqlVenta = `
                 INSERT INTO ventas (
                     cliente_id, subtotal, impuesto_total, total, 
-                    metodo_pago, estado, clave_acceso, estado_sri
+                    metodo_pago, estado, clave_acceso, estado_sri, cajero_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const resVenta = await this.db.run(sqlVenta, [
                 venta.clienteId || null,
@@ -108,16 +106,38 @@ export class VentasService {
                 venta.metodoPago,
                 EstadoVenta.COMPLETADA,
                 claveAcceso,
-                'pendiente'
+                'pendiente',
+                usuarioId
             ]);
             const ventaId = resVenta.lastInsertRowid;
 
-            // 3. Detalles y Stock
+            // 3. Registrar Receta si existe (ARCSA / Controlados)
+            if (receta) {
+                const sqlReceta = `
+                    INSERT INTO recetas (
+                        venta_id, cliente_id, medico_nombre, medico_registro, 
+                        receta_numero, fecha_emision, observaciones, estado
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                await this.db.run(sqlReceta, [
+                    ventaId,
+                    venta.clienteId || null,
+                    receta.medicoNombre || null,
+                    receta.medicoRegistro || null,
+                    receta.recetaNumero || null,
+                    receta.fechaEmision || new Date().toISOString().split('T')[0],
+                    receta.observaciones || null,
+                    'validada'
+                ]);
+            }
+
+            // 4. Detalles y Stock
             if (venta.detalles) {
                 for (const det of venta.detalles) {
                     const sqlDet = `
-                        INSERT INTO ventas_detalles (venta_id, lote_id, presentacion_id, cantidad, precio_unitario, subtotal)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO ventas_detalles (venta_id, lote_id, presentacion_id, cantidad, precio_unitario, subtotal, es_fraccion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                     `;
                     await this.db.run(sqlDet, [
                         ventaId,
@@ -125,24 +145,26 @@ export class VentasService {
                         det.presentacionId || null,
                         det.cantidad,
                         det.precioUnitario,
-                        det.subtotal
+                        det.subtotal,
+                        det.esFraccion ? 1 : 0
                     ]);
 
                     // Descontar del lote
                     const sqlUpdateLote = `UPDATE lotes SET stock_actual = stock_actual - ? WHERE id = ?`;
                     await this.db.run(sqlUpdateLote, [det.cantidad, det.loteId]);
 
-                    // Registrar Movimiento
+                    // Registrar Movimiento con Usuario
                     const sqlMov = `
-                        INSERT INTO movimientos_stock (tipo, lote_id, cantidad, documento_referencia, observaciones)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO movimientos_stock (tipo, lote_id, cantidad, documento_referencia, observaciones, usuario_id)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     `;
                     await this.db.run(sqlMov, [
                         TipoMovimiento.SALIDA_VENTA,
                         det.loteId,
                         -det.cantidad,
                         `V-${ventaId}`,
-                        `Venta registrada #${ventaId} (Clave: ${claveAcceso.substring(0, 10)}...)`
+                        `Venta registrada #${ventaId} (Clave: ${claveAcceso.substring(0, 10)}...)`,
+                        usuarioId
                     ]);
                 }
             }
@@ -152,6 +174,57 @@ export class VentasService {
             console.error('Error registrando venta:', e);
             throw e;
         }
+    }
+
+    /**
+     * Obtiene todas las recetas registradas para reportes legales (ARCSA)
+     */
+    async obtenerRecetasARCSA(filtros: { inicio?: string; fin?: string } = {}): Promise<any[]> {
+        let sql = `
+            SELECT 
+                r.*,
+                v.fecha_venta,
+                c.nombre_completo as cliente_nombre,
+                c.documento as cliente_documento
+            FROM recetas r
+            JOIN ventas v ON r.venta_id = v.id
+            LEFT JOIN clientes c ON r.cliente_id = c.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (filtros.inicio) {
+            sql += ` AND date(v.fecha_venta) >= ?`;
+            params.push(filtros.inicio);
+        }
+        if (filtros.fin) {
+            sql += ` AND date(v.fecha_venta) <= ?`;
+            params.push(filtros.fin);
+        }
+
+        sql += ` ORDER BY v.fecha_venta DESC`;
+        
+        const result = await this.db.query<any>(sql, params);
+        const recetas = this.db.toCamelCase(result);
+
+        // Para cada receta, traer los productos controlados de esa venta
+        for (const receta of recetas) {
+            const prodSql = `
+                SELECT 
+                    p.nombre_comercial,
+                    p.principio_activo,
+                    vd.cantidad,
+                    pres.unidad_base
+                FROM ventas_detalles vd
+                JOIN presentaciones pres ON vd.presentacion_id = pres.id
+                JOIN productos p ON pres.producto_id = p.id
+                WHERE vd.venta_id = ? AND (p.requiere_receta = 1 OR p.es_controlado = 1)
+            `;
+            const productos = await this.db.query<any>(prodSql, [receta.ventaId]);
+            receta.productos = this.db.toCamelCase(productos);
+        }
+
+        return recetas;
     }
 }
 

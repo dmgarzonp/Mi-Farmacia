@@ -126,8 +126,8 @@ export class AutocompleteComponent implements ControlValueAccessor, OnChanges {
     const query = this.searchQuery().toLowerCase();
     const allItems = this.itemsSignal();
     
-    if (!query && !this.isOpen()) return [];
-    if (!query) return allItems.slice(0, 10);
+    // Si no hay texto, no mostramos nada (mantiene la búsqueda cerrada al estar vacío)
+    if (!query) return [];
     
     return allItems.filter(item => 
       item.label.toLowerCase().includes(query) || 
@@ -172,6 +172,12 @@ export class AutocompleteComponent implements ControlValueAccessor, OnChanges {
       this.searchQuery.set('');
       this.isOpen.set(false);
       this.itemSelected.emit(item);
+      // Refocar el input inmediatamente para la siguiente búsqueda
+      setTimeout(() => {
+        if (this.inputElement) {
+          this.inputElement.nativeElement.focus();
+        }
+      }, 0);
       return;
     }
 

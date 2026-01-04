@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { PosComponent } from './components/pos/pos.component';
 import { VentasListComponent } from './components/ventas-list/ventas-list.component';
+import { ArcsaReportComponent } from './components/arcsa-report/arcsa-report.component';
 
 export const ventasRoutes: Routes = [
     {
@@ -12,6 +13,11 @@ export const ventasRoutes: Routes = [
         path: 'pos',
         component: PosComponent,
         data: { breadcrumb: 'Punto de Venta (POS)' }
+    },
+    {
+        path: 'reporte-arcsa',
+        component: ArcsaReportComponent,
+        data: { breadcrumb: 'Reporte ARCSA' }
     }
 ];
 

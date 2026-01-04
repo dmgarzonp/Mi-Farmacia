@@ -1,8 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
+import { AuthService } from '../../core/services/auth.service';
 
 interface NavItem {
     label: string;
@@ -23,6 +24,7 @@ interface NavItem {
     styles: []
 })
 export class SidebarComponent {
+    authService = inject(AuthService);
     isCollapsed = signal(false);
     icons = APP_ICONS;
 

@@ -1,11 +1,12 @@
-<div class="h-full flex flex-col gap-6 animate-fade-in pb-6">
+<div class="h-full flex flex-col gap-4 animate-fade-in pb-4 -mt-2">
   <!-- Top Bar: Buscador Principal -->
-  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium flex items-center gap-6 relative z-[50]">
+  <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-5 rounded-[2rem] shadow-premium flex items-center gap-6 relative z-[50]">
     <div class="flex-1">
       <app-autocomplete
         [items]="productosItems"
         placeholder="Escanear código de barras o buscar producto por nombre comercial..."
         iconName="SEARCH"
+        [autoClear]="true"
         (itemSelected)="onProductoSelected($event)"
       ></app-autocomplete>
     </div>
@@ -16,10 +17,45 @@
     </div>
   </div>
 
+  <!-- Panel de Alternativas / Sustitutos (NUEVO) -->
+  <div *ngIf="alternativas().length > 0" class="animate-slide-down">
+    <div class="bg-amber-50 border border-amber-200 rounded-3xl p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-[10px] font-black text-amber-800 uppercase tracking-widest flex items-center gap-2">
+          <span class="w-4 h-4" [innerHTML]="icons.SEARCH | safeHtml"></span>
+          Alternativas Bioequivalentes para: <span class="text-amber-600 italic">"{{ principioActivoSeleccionado() }}"</span>
+        </h3>
+        <button (click)="alternativas.set([])" class="text-amber-400 hover:text-amber-600 transition-colors">
+          <span class="w-4 h-4 block" [innerHTML]="icons.DELETE | safeHtml"></span>
+        </button>
+      </div>
+      
+      <div class="flex flex-wrap gap-3">
+        <button 
+          *ngFor="let alt of alternativas()"
+          (click)="seleccionarAlternativa(alt)"
+          class="flex-1 min-w-[200px] bg-white border border-amber-100 p-3 rounded-2xl flex items-center gap-3 hover:border-amber-400 hover:shadow-md transition-all group"
+        >
+          <div class="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+            <span class="w-3.5 h-3.5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+          </div>
+          <div class="text-left min-w-0">
+            <p class="text-[10px] font-black text-slate-700 truncate">{{ alt.producto.nombreComercial }}</p>
+            <p class="text-[8px] text-slate-400 uppercase font-medium">{{ alt.presentacion.nombreDescriptivo }}</p>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-[9px] font-black text-amber-600">{{ alt.precio | currencyFormat }}</span>
+              <span class="text-[7px] bg-emerald-50 text-emerald-600 px-1 rounded font-bold uppercase">Stock: {{ alt.stock }}</span>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
     <!-- Panel Izquierdo: Carrito de Ventas -->
     <div class="flex-1 flex flex-col bg-white/80 backdrop-blur-xl border border-white/20 rounded-[2.5rem] shadow-premium overflow-hidden">
-      <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <div class="px-8 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
         <h2 class="text-sm font-black text-gray-800 uppercase tracking-[0.2em] flex items-center gap-3">
           <span class="w-1.5 h-4 bg-primary-500 rounded-full"></span>
           Lista de Venta
@@ -105,7 +141,7 @@
     <!-- Panel Derecho: Checkout -->
     <div class="w-full lg:w-[360px] flex flex-col gap-4 shrink-0">
       <!-- Selección de Cliente -->
-      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-6 rounded-[2rem] shadow-premium relative z-[30]">
+      <div class="bg-white/80 backdrop-blur-xl border border-white/20 p-5 rounded-[2rem] shadow-premium relative z-[30]">
         <h3 class="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
           <span class="w-4 h-4 text-primary-500" [innerHTML]="icons.USERS | safeHtml"></span>
           Información del Comprobante
@@ -149,7 +185,7 @@
       </div>
 
       <!-- Resumen y Pago -->
-      <div class="bg-primary-900 text-white p-6 rounded-[2rem] shadow-premium relative overflow-hidden group flex flex-col">
+      <div class="bg-primary-900 text-white p-5 rounded-[2rem] shadow-premium relative overflow-hidden group flex flex-col">
         <div class="absolute -right-10 -top-10 w-48 h-48 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-1000"></div>
         
         <h3 class="text-[9px] font-black text-primary-400 uppercase tracking-[0.3em] mb-4 relative z-10">Resumen de Venta</h3>
@@ -176,46 +212,73 @@
           </div>
         </div>
 
-        <div class="mt-8 space-y-4 relative z-10">
-          <!-- Métodos de Pago -->
-          <div class="grid grid-cols-3 gap-2">
-            <button 
-              (click)="metodoPago.set('efectivo')"
-              [class.bg-primary-500]="metodoPago() === 'efectivo'"
-              [class.text-primary-950]="metodoPago() === 'efectivo'"
-              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
-            >
-              <span class="text-[8px] font-black uppercase tracking-widest">Efectivo</span>
-            </button>
-            <button 
-              (click)="metodoPago.set('tarjeta')"
-              [class.bg-primary-500]="metodoPago() === 'tarjeta'"
-              [class.text-primary-950]="metodoPago() === 'tarjeta'"
-              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
-            >
-              <span class="text-[8px] font-black uppercase tracking-widest">Tarjeta</span>
-            </button>
-            <button 
-              (click)="metodoPago.set('transferencia')"
-              [class.bg-primary-500]="metodoPago() === 'transferencia'"
-              [class.text-primary-950]="metodoPago() === 'transferencia'"
-              class="flex flex-col items-center gap-1 p-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
-            >
-              <span class="text-[8px] font-black uppercase tracking-widest">Transf.</span>
-            </button>
+        <div class="mt-8 space-y-5 relative z-10 flex-1 flex flex-col">
+          <!-- Métodos de Pago Re-diseñados con Uniformidad -->
+          <div class="space-y-3 shrink-0">
+            <span class="text-[9px] font-black text-primary-300/60 uppercase tracking-[0.2em]">Método de Pago</span>
+            <div class="grid grid-cols-3 gap-2">
+              <!-- Efectivo -->
+              <button 
+                (click)="metodoPago.set('efectivo'); referenciaPago.set('')"
+                [class]="metodoPago() === 'efectivo' ? 'bg-emerald-500 text-primary-950 border-emerald-400 shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-primary-100/40 border-white/5 hover:bg-white/10'"
+                class="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-300"
+              >
+                <span class="w-4 h-4" [innerHTML]="icons.TRUCK | safeHtml"></span>
+                <span class="text-[8px] font-black uppercase tracking-widest">Efectivo</span>
+              </button>
+              
+              <!-- Tarjeta -->
+              <button 
+                (click)="metodoPago.set('tarjeta')"
+                [class]="metodoPago() === 'tarjeta' ? 'bg-emerald-500 text-primary-950 border-emerald-400 shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-primary-100/40 border-white/5 hover:bg-white/10'"
+                class="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-300"
+              >
+                <span class="w-4 h-4" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+                <span class="text-[8px] font-black uppercase tracking-widest">Tarjeta</span>
+              </button>
+
+              <!-- Transferencia -->
+              <button 
+                (click)="metodoPago.set('transferencia')"
+                [class]="metodoPago() === 'transferencia' ? 'bg-emerald-500 text-primary-950 border-emerald-400 shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-primary-100/40 border-white/5 hover:bg-white/10'"
+                class="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all duration-300"
+              >
+                <span class="w-4 h-4" [innerHTML]="icons.VIEW | safeHtml"></span>
+                <span class="text-[8px] font-black uppercase tracking-widest">Transf.</span>
+              </button>
+            </div>
           </div>
 
-          <app-button
-            variant="primary"
-            size="md"
-            [fullWidth]="true"
-            [disabled]="cart().length === 0 || guardando()"
-            [loading]="guardando()"
-            (clicked)="finalizarVenta()"
-            iconNameLeft="SAVE"
-          >
-            Finalizar Venta
-          </app-button>
+          <!-- Campos adicionales integrados sin superposición -->
+          <div *ngIf="metodoPago() !== 'efectivo'" class="animate-slide-up shrink-0 relative z-10">
+            <div class="bg-primary-950/40 rounded-2xl p-4 border border-white/10">
+              <label class="block text-[8px] font-black text-primary-300 uppercase tracking-widest mb-2">
+                {{ metodoPago() === 'tarjeta' ? 'No. de Voucher / Lote' : 'No. de Referencia Bancaria' }}
+              </label>
+              <input 
+                type="text" 
+                [ngModel]="referenciaPago()"
+                (ngModelChange)="referenciaPago.set($event)"
+                class="w-full bg-primary-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all"
+                [placeholder]="metodoPago() === 'tarjeta' ? 'Ej: 001234' : 'Ej: TRANS-987'"
+              />
+            </div>
+          </div>
+
+          <!-- Botón de acción principal con Z-INDEX garantizado -->
+          <div class="pt-4 mt-auto relative z-20">
+            <app-button
+              variant="primary"
+              size="md"
+              [fullWidth]="true"
+              [disabled]="cart().length === 0 || guardando()"
+              [loading]="guardando()"
+              (clicked)="finalizarVenta()"
+              iconNameLeft="SAVE"
+            >
+              Confirmar y Cobrar
+            </app-button>
+          </div>
         </div>
       </div>
     </div>
@@ -232,6 +295,72 @@
     (saved)="onClienteGuardado($event)"
     (cancelar)="showModalCliente.set(false)"
   ></app-cliente-form>
+</app-modal>
+
+<!-- Modal Registro de Receta (ARCSA / Controlados) -->
+<app-modal
+  [isOpen]="showModalReceta()"
+  (closed)="showModalReceta.set(false)"
+  size="xl"
+>
+  <div class="p-8">
+    <div class="flex items-center gap-4 mb-8">
+      <div class="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+        <span class="w-6 h-6" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Registro de Receta Médica</h2>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Requisito Legal ARCSA para Antibióticos y Controlados</p>
+      </div>
+    </div>
+
+    <form [formGroup]="recetaForm" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <app-input 
+          label="Nombre del Médico" 
+          formControlName="medicoNombre" 
+          placeholder="Ej: Dr. Juan Pérez"
+          [required]="true"
+        ></app-input>
+        
+        <app-input 
+          label="Registro / Cédula Médico" 
+          formControlName="medicoRegistro" 
+          placeholder="Ej: 1712345678"
+          [required]="true"
+        ></app-input>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <app-input 
+          label="Número de Receta" 
+          formControlName="recetaNumero" 
+          placeholder="Ej: REC-2025-001"
+          [required]="true"
+        ></app-input>
+        
+        <app-input 
+          label="Fecha de Emisión" 
+          type="date"
+          formControlName="fechaEmision"
+          [required]="true"
+        ></app-input>
+      </div>
+
+      <app-input 
+        label="Observaciones Adicionales" 
+        formControlName="observaciones" 
+        placeholder="Cualquier dato relevante de la receta..."
+      ></app-input>
+
+      <div class="flex justify-end gap-3 pt-4">
+        <app-button variant="secondary" (clicked)="showModalReceta.set(false)">Cancelar</app-button>
+        <app-button variant="primary" (clicked)="finalizarVenta()" [loading]="guardando()" iconNameLeft="CHECK">
+          Validar y Finalizar Venta
+        </app-button>
+      </div>
+    </form>
+  </div>
 </app-modal>
 
 

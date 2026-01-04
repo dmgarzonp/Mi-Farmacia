@@ -2,7 +2,8 @@
   <!-- Title Bar Personalizada (Control de ventana) -->
   <app-title-bar></app-title-bar>
 
-  <div class="flex flex-1 overflow-hidden">
+  <!-- Layout para Usuarios Autenticados -->
+  <div *ngIf="authService.estaAutenticado()" class="flex flex-1 overflow-hidden">
     <!-- Sidebar -->
     <app-sidebar></app-sidebar>
     
@@ -19,6 +20,11 @@
         <router-outlet />
       </main>
     </div>
+  </div>
+
+  <!-- Layout para Usuarios NO Autenticados (Login) -->
+  <div *ngIf="!authService.estaAutenticado()" class="flex-1 overflow-hidden">
+    <router-outlet />
   </div>
 </div>
 

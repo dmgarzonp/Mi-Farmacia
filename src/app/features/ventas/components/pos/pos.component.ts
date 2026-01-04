@@ -11,7 +11,7 @@ import { AlertService } from '../../../../shared/components/alert/alert.componen
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
-import { Producto, Lote, Cliente, DetalleVenta, Venta, Presentacion } from '../../../../core/models';
+import { Producto, Lote, Cliente, DetalleVenta, Venta, Presentacion, Receta } from '../../../../core/models';
 import { RideService } from '../../../../core/services/ride.service';
 import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { ClienteFormComponent } from '../../../clientes/components/cliente-form/cliente-form.component';
@@ -58,11 +58,20 @@ export class PosComponent implements OnInit {
     cart = signal<CartItem[]>([]);
     selectedClienteId = signal<number | null>(null);
     metodoPago = signal<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo');
+    referenciaPago = signal(''); // Para voucher o número de transferencia
     tipoComprobante = signal<'01' | '00'>('01'); // 01: Factura (SRI), 00: Nota de Venta / Consumidor Final
     showModalCliente = signal(false);
+    showModalReceta = signal(false);
     guardando = signal(false);
+    
+    // Sustitutos y Alternativas
+    alternativas = signal<any[]>([]);
+    buscandoAlternativas = signal(false);
+    principioActivoSeleccionado = signal<string | null>(null);
 
-    // Totales calculados (Fase 1: Inteligencia Fiscal Ecuador - Robustecido)
+    // Datos de Receta (ARCSA)
+    recetaForm!: FormGroup;
+    requiereReceta = computed(() => this.cart().some(item => item.producto.requiereReceta || item.producto.esControlado));
     subtotalBase0 = computed(() => {
         const cart = this.cart();
         console.log('Cart updated:', cart);
@@ -110,7 +119,7 @@ export class PosComponent implements OnInit {
                             id: pres.id, // IMPORTANTE: El ID ahora es de la presentación
                             productId: p.id,
                             label: `${p.nombreComercial} - ${pres.nombreDescriptivo}`,
-                            sublabel: `${stockLabel} | ${this.currencyPipe.transform(pres.precioVentaCaja)} | ${p.tarifaIva === 2 ? 'IVA 15%' : 'IVA 0%'}`
+                            sublabel: `${p.principioActivo ? p.principioActivo + ' | ' : ''}${stockLabel} | ${this.currencyPipe.transform(pres.precioVentaCaja)} | ${p.tarifaIva === 2 ? 'IVA 15%' : 'IVA 0%'}`
                         });
                     }
                 });
@@ -128,10 +137,21 @@ export class PosComponent implements OnInit {
     }
 
     async ngOnInit() {
+        this.initRecetaForm();
         await Promise.all([
             this.productosService.cargarProductos(),
             this.clientesService.cargarClientes()
         ]);
+    }
+
+    private initRecetaForm() {
+        this.recetaForm = this.fb.group({
+            medicoNombre: ['', Validators.required],
+            medicoRegistro: ['', Validators.required],
+            recetaNumero: ['', Validators.required],
+            fechaEmision: [new Date().toISOString().split('T')[0], Validators.required],
+            observaciones: ['']
+        });
     }
 
     onClienteGuardado(clienteId: number) {
@@ -146,6 +166,15 @@ export class PosComponent implements OnInit {
         // Buscar el producto y la presentación
         const producto = this.productosService.productos().find(p => p.id === event.productId);
         if (!producto || !producto.presentaciones) return;
+
+        // Cargar alternativas si tiene principio activo
+        if (producto.principioActivo) {
+            this.principioActivoSeleccionado.set(producto.principioActivo);
+            this.buscarSustitutos(producto.principioActivo, producto.id!);
+        } else {
+            this.principioActivoSeleccionado.set(null);
+            this.alternativas.set([]);
+        }
 
         const presentacion = producto.presentaciones.find(pres => pres.id === event.id);
         if (!presentacion) return;
@@ -197,7 +226,7 @@ export class PosComponent implements OnInit {
             if (item.esFraccion) {
                 // Cambiar a unidades base
                 item.precioUnitario = item.presentacion.precioVentaUnidad;
-                item.cantidad = item.presentacion.unidadesPorCaja;
+                item.cantidad = 1; // Ajuste: Por defecto 1 unidad al fraccionar, no la caja completa
             } else {
                 // Cambiar a cajas
                 item.precioUnitario = item.presentacion.precioVentaCaja;
@@ -211,6 +240,54 @@ export class PosComponent implements OnInit {
 
     removeItem(index: number) {
         this.cart.update(items => items.filter((_, i) => i !== index));
+    }
+
+    /**
+     * Busca productos con el mismo principio activo pero diferente ID
+     */
+    buscarSustitutos(principioActivo: string, productoIdActual: number) {
+        this.buscandoAlternativas.set(true);
+        
+        // Simular un pequeño delay para feedback visual
+        setTimeout(() => {
+            const productos = this.productosService.productos();
+            const matching = [];
+
+            for (const p of productos) {
+                // Mismo principio activo, diferente producto
+                if (p.id !== productoIdActual && 
+                    p.principioActivo && 
+                    p.principioActivo.toLowerCase().includes(principioActivo.toLowerCase())) {
+                    
+                    // Solo si tiene presentaciones con stock
+                    if (p.presentaciones) {
+                        for (const pres of p.presentaciones) {
+                            if ((pres.stockTotal || 0) > 0) {
+                                matching.push({
+                                    producto: p,
+                                    presentacion: pres,
+                                    stock: pres.stockTotal,
+                                    precio: pres.precioVentaCaja
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            this.alternativas.set(matching.slice(0, 5)); // Mostrar máximo 5
+            this.buscandoAlternativas.set(false);
+        }, 300);
+    }
+
+    seleccionarAlternativa(alt: any) {
+        this.onProductoSelected({
+            id: alt.presentacion.id,
+            productId: alt.producto.id
+        });
+        // Limpiar alternativas después de seleccionar una
+        this.alternativas.set([]);
+        this.principioActivoSeleccionado.set(null);
     }
 
     updateQuantity(index: number, qty: number) {
@@ -243,6 +320,19 @@ export class PosComponent implements OnInit {
             this.alertService.warning('Para emitir una Factura RUC debe seleccionar un cliente.');
             return;
         }
+
+        // Validación de Receta (ARCSA / Controlados)
+        if (this.requiereReceta() && !this.showModalReceta()) {
+            this.showModalReceta.set(true);
+            this.alertService.info('Esta venta contiene productos controlados o bajo receta. Por favor, registre los datos de la receta médica.');
+            return;
+        }
+
+        if (this.requiereReceta() && this.recetaForm.invalid) {
+            this.recetaForm.markAllAsTouched();
+            this.alertService.error('Debe completar todos los datos de la receta médica.');
+            return;
+        }
         
         this.guardando.set(true);
         try {
@@ -252,7 +342,8 @@ export class PosComponent implements OnInit {
                 presentacionNombre: item.presentacion.nombreDescriptivo,
                 cantidad: item.esFraccion ? item.cantidad : item.cantidad * (item.presentacion.unidadesPorCaja || 1),
                 precioUnitario: item.precioUnitario,
-                subtotal: item.subtotal
+                subtotal: item.subtotal,
+                esFraccion: item.esFraccion
             }));
 
             const venta: Partial<Venta> = {
@@ -264,7 +355,13 @@ export class PosComponent implements OnInit {
                 detalles
             };
 
-            const ventaId = await this.ventasService.registrarVenta(venta);
+            // Añadir referencia a observaciones si existe
+            if (this.referenciaPago()) {
+                venta.metodoPago = `${venta.metodoPago} (${this.referenciaPago()})`;
+            }
+
+            const recetaData = this.requiereReceta() ? this.recetaForm.value : undefined;
+            const ventaId = await this.ventasService.registrarVenta(venta, recetaData);
             
             // --- Generación Automática de RIDE (Fase 3) ---
             try {
@@ -290,6 +387,10 @@ export class PosComponent implements OnInit {
             this.cart.set([]);
             this.selectedClienteId.set(null);
             this.tipoComprobante.set('00'); // Volver a Consumidor Final
+            this.showModalReceta.set(false);
+            this.recetaForm.reset({
+                fechaEmision: new Date().toISOString().split('T')[0]
+            });
             await this.productosService.cargarProductos(); // Recargar stock
         } catch (e: any) {
             this.alertService.error('Error al procesar venta: ' + e.message);
