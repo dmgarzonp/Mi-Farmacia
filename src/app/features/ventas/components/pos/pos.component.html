@@ -15,6 +15,14 @@
       <span class="w-5 h-5 text-primary-600" [innerHTML]="icons.CART | safeHtml"></span>
       <span class="text-sm font-black text-primary-700 uppercase tracking-widest">{{ cart().length }} Items</span>
     </div>
+
+    <!-- Indicador de Caja Abierta/Cerrada -->
+    <div (click)="!hayCajaAbierta() ? showModalApertura.set(true) : null"
+      [class]="hayCajaAbierta() ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600 cursor-pointer hover:bg-red-100'"
+      class="flex items-center gap-3 px-6 py-3 rounded-2xl border transition-all">
+      <span class="w-5 h-5" [innerHTML]="(hayCajaAbierta() ? icons.CHECK : icons.DELETE) | safeHtml"></span>
+      <span class="text-sm font-black uppercase tracking-widest">{{ hayCajaAbierta() ? 'Caja Abierta' : 'Caja Cerrada' }}</span>
+    </div>
   </div>
 
   <!-- Panel de Alternativas / Sustitutos (NUEVO) -->
@@ -60,7 +68,7 @@
           <span class="w-1.5 h-4 bg-primary-500 rounded-full"></span>
           Lista de Venta
         </h2>
-        <button (click)="cart.set([])" class="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors">Vaciar Carrito</button>
+        <button (click)="vaciarCarrito()" class="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors">Vaciar Carrito</button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
@@ -360,6 +368,54 @@
         </app-button>
       </div>
     </form>
+  </div>
+</app-modal>
+
+<!-- Modal Apertura de Caja (Turnos) -->
+<app-modal
+  [isOpen]="showModalApertura()"
+  (closed)="showModalApertura.set(false)"
+  size="md"
+>
+  <div class="p-8">
+    <div class="flex items-center gap-4 mb-8">
+      <div class="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
+        <span class="w-6 h-6" [innerHTML]="icons.SAVE | safeHtml"></span>
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Apertura de Caja</h2>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Declare su fondo inicial para transacciones</p>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Monto Inicial (Efectivo)</label>
+        <div class="flex items-center gap-4">
+          <span class="text-3xl font-black text-slate-300">$</span>
+          <input 
+            type="number" 
+            [(ngModel)]="montoApertura"
+            class="flex-1 bg-transparent text-4xl font-black text-slate-800 focus:outline-none placeholder:text-slate-200"
+            placeholder="0.00"
+            step="0.01"
+            min="0"
+          />
+        </div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-4">
+        <span class="w-5 h-5 text-amber-500 shrink-0" [innerHTML]="icons.SEARCH | safeHtml"></span>
+        <p class="text-[10px] font-medium text-amber-700 leading-relaxed uppercase">
+          Al abrir caja, todas las ventas que realice quedarán vinculadas a este turno para el arqueo final.
+        </p>
+      </div>
+
+      <div class="flex gap-3">
+        <app-button variant="secondary" [fullWidth]="true" (clicked)="showModalApertura.set(false)">Cancelar</app-button>
+        <app-button variant="primary" [fullWidth]="true" (clicked)="abrirCaja()">Abrir Turno</app-button>
+      </div>
+    </div>
   </div>
 </app-modal>
 

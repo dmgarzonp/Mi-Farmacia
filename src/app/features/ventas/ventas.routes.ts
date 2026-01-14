@@ -18,6 +18,11 @@ export const ventasRoutes: Routes = [
         path: 'reporte-arcsa',
         component: ArcsaReportComponent,
         data: { breadcrumb: 'Reporte ARCSA' }
+    },
+    {
+        path: 'caja',
+        loadComponent: () => import('./components/caja-control/caja-control.component').then(m => m.CajaControlComponent),
+        data: { breadcrumb: 'Control de Caja' }
     }
 ];
 

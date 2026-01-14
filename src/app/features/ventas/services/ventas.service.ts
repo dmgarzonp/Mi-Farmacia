@@ -3,6 +3,7 @@ import { DatabaseService } from '../../../core/services/database.service';
 import { Venta, DetalleVenta, TipoMovimiento, EstadoVenta, Lote, Receta } from '../../../core/models';
 import { SriService } from '../../../core/services/sri.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { CajaService } from '../../../core/services/caja.service';
 
 @Injectable({
     providedIn: 'root'
@@ -11,6 +12,7 @@ export class VentasService {
     private db = inject(DatabaseService);
     private sriService = inject(SriService);
     private authService = inject(AuthService);
+    private cajaService = inject(CajaService);
     
     ventas = signal<Venta[]>([]);
     loading = signal<boolean>(false);
@@ -91,12 +93,14 @@ export class VentasService {
 
             // 2. Cabecera con Clave de Acceso y Usuario
             const usuarioId = this.authService.usuarioActual()?.id || null;
+            const sesionCajaId = this.cajaService.sesionActiva()?.id || null;
+            
             const sqlVenta = `
                 INSERT INTO ventas (
                     cliente_id, subtotal, impuesto_total, total, 
-                    metodo_pago, estado, clave_acceso, estado_sri, cajero_id
+                    metodo_pago, estado, clave_acceso, estado_sri, cajero_id, sesion_caja_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const resVenta = await this.db.run(sqlVenta, [
                 venta.clienteId || null,
@@ -107,7 +111,8 @@ export class VentasService {
                 EstadoVenta.COMPLETADA,
                 claveAcceso,
                 'pendiente',
-                usuarioId
+                usuarioId,
+                sesionCajaId
             ]);
             const ventaId = resVenta.lastInsertRowid;
 

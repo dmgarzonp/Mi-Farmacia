@@ -210,6 +210,7 @@ export interface Venta {
     total: number;
     estado: EstadoVenta;
     cajeroId?: number;
+    sesionCajaId?: number;
     metodoPago?: string;
     
     // Facturación Electrónica (Fase 2)
@@ -257,6 +258,24 @@ export interface DetalleVenta {
     precioUnitario: number;
     subtotal: number;
     esFraccion?: boolean;
+}
+
+/**
+ * Sesión de Caja (Arqueo y Turnos)
+ */
+export interface CajaSesion {
+    id?: number;
+    usuarioId: number;
+    usuarioNombre?: string;
+    fechaApertura: string;
+    fechaCierre?: string;
+    montoInicial: number;
+    montoFinalEfectivo?: number;
+    montoFinalTarjeta?: number;
+    montoFinalTransferencia?: number;
+    montoEsperadoEfectivo?: number;
+    observaciones?: string;
+    estado: 'abierta' | 'cerrada';
 }
 
 /**

@@ -13,6 +13,8 @@ import { APP_ICONS } from '../../../../core/constants/icons';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
 import { Producto, Lote, Cliente, DetalleVenta, Venta, Presentacion, Receta } from '../../../../core/models';
 import { RideService } from '../../../../core/services/ride.service';
+import { CajaService } from '../../../../core/services/caja.service';
+import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { ClienteFormComponent } from '../../../clientes/components/cliente-form/cliente-form.component';
 
@@ -53,6 +55,8 @@ export class PosComponent implements OnInit {
     private alertService = inject(AlertService);
     private currencyPipe = inject(CurrencyFormatPipe);
     private rideService = inject(RideService);
+    private confirmService = inject(ConfirmService);
+    protected cajaService = inject(CajaService);
     
     icons = APP_ICONS;
     cart = signal<CartItem[]>([]);
@@ -62,6 +66,8 @@ export class PosComponent implements OnInit {
     tipoComprobante = signal<'01' | '00'>('01'); // 01: Factura (SRI), 00: Nota de Venta / Consumidor Final
     showModalCliente = signal(false);
     showModalReceta = signal(false);
+    showModalApertura = signal(false);
+    montoApertura = signal(0);
     guardando = signal(false);
     
     // Sustitutos y Alternativas
@@ -71,6 +77,7 @@ export class PosComponent implements OnInit {
 
     // Datos de Receta (ARCSA)
     recetaForm!: FormGroup;
+    hayCajaAbierta = computed(() => this.cajaService.hayCajaAbierta());
     requiereReceta = computed(() => this.cart().some(item => item.producto.requiereReceta || item.producto.esControlado));
     subtotalBase0 = computed(() => {
         const cart = this.cart();
@@ -195,16 +202,27 @@ export class PosComponent implements OnInit {
         // Agregar al carrito o aumentar cantidad
         this.cart.update(items => {
             const existing = items.find(i => i.presentacion.id === presentacion.id && i.lote.id === loteSeleccionado.id && !i.esFraccion);
+            
+            // Calcular total ya solicitado de este lote en el carrito
+            const totalSolicitadoLote = items
+                .filter(i => i.lote.id === loteSeleccionado.id)
+                .reduce((acc, i) => acc + (i.esFraccion ? i.cantidad : i.cantidad * (i.presentacion.unidadesPorCaja || 1)), 0);
+
             if (existing) {
                 const stockNecesario = (existing.cantidad + 1) * (presentacion.unidadesPorCaja || 1);
-                if (stockNecesario > loteSeleccionado.stockActual) {
-                    this.alertService.warning('Stock insuficiente en este lote');
+                // Validamos contra el total acumulado del lote en el carrito
+                if (totalSolicitadoLote + (presentacion.unidadesPorCaja || 1) > loteSeleccionado.stockActual) {
+                    this.alertService.warning('Stock insuficiente en este lote (incluyendo lo ya agregado al carrito)');
                     return items;
                 }
                 existing.cantidad++;
                 existing.subtotal = existing.cantidad * existing.precioUnitario;
                 return [...items];
             } else {
+                if (totalSolicitadoLote + (presentacion.unidadesPorCaja || 1) > loteSeleccionado.stockActual) {
+                    this.alertService.warning('Stock insuficiente en este lote (ya has agregado el máximo disponible al carrito)');
+                    return items;
+                }
                 return [...items, {
                     producto,
                     presentacion,
@@ -240,6 +258,24 @@ export class PosComponent implements OnInit {
 
     removeItem(index: number) {
         this.cart.update(items => items.filter((_, i) => i !== index));
+    }
+
+    async vaciarCarrito() {
+        if (this.cart().length === 0) return;
+
+        const confirmado = await this.confirmService.ask({
+            title: 'Vaciar Carrito',
+            message: '¿Está seguro de que desea eliminar todos los productos del carrito?',
+            confirmText: 'Sí, Vaciar',
+            variant: 'danger'
+        });
+
+        if (confirmado) {
+            this.cart.set([]);
+            this.alternativas.set([]);
+            this.principioActivoSeleccionado.set(null);
+            this.alertService.info('Carrito vaciado');
+        }
     }
 
     /**
@@ -296,12 +332,19 @@ export class PosComponent implements OnInit {
             const unidadesPorCaja = item.presentacion.unidadesPorCaja || 1;
             const stockActual = item.lote.stockActual;
             
-            let nuevaCantidad = qty;
-            const totalUnidades = item.esFraccion ? nuevaCantidad : nuevaCantidad * unidadesPorCaja;
+            // Calcular cuánto están pidiendo los OTROS items del mismo lote
+            const solicitadoOtros = items
+                .filter((_, i) => i !== index)
+                .filter(i => i.lote.id === item.lote.id)
+                .reduce((acc, i) => acc + (i.esFraccion ? i.cantidad : i.cantidad * (i.presentacion.unidadesPorCaja || 1)), 0);
 
-            if (totalUnidades > stockActual) {
-                this.alertService.warning(`Stock insuficiente. Disponible: ${stockActual} unidades`);
-                nuevaCantidad = item.esFraccion ? stockActual : Math.floor(stockActual / unidadesPorCaja);
+            let nuevaCantidad = qty;
+            const totalUnidadesSolicitadas = item.esFraccion ? nuevaCantidad : nuevaCantidad * unidadesPorCaja;
+
+            if (solicitadoOtros + totalUnidadesSolicitadas > stockActual) {
+                const disponibleReal = stockActual - solicitadoOtros;
+                this.alertService.warning(`Stock insuficiente para este lote. Disponible restante: ${disponibleReal} unidades`);
+                nuevaCantidad = item.esFraccion ? disponibleReal : Math.floor(disponibleReal / unidadesPorCaja);
             } else if (nuevaCantidad < 1) {
                 nuevaCantidad = 1;
             }
@@ -312,8 +355,44 @@ export class PosComponent implements OnInit {
         });
     }
 
+    async abrirCaja() {
+        if (this.montoApertura() < 0) {
+            this.alertService.warning('El monto inicial no puede ser negativo');
+            return;
+        }
+
+        const success = await this.cajaService.abrirCaja(this.montoApertura());
+        if (success) {
+            this.showModalApertura.set(false);
+            this.montoApertura.set(0);
+        }
+    }
+
     async finalizarVenta() {
+        if (!this.hayCajaAbierta()) {
+            this.showModalApertura.set(true);
+            return;
+        }
+
         if (this.cart().length === 0) return;
+
+        // Validación de Stock Acumulado por Lote (SQLITE_CONSTRAINT_CHECK Fix)
+        const items = this.cart();
+        const lotesMap = new Map<number, { nombre: string, solicitado: number, disponible: number }>();
+        
+        for (const item of items) {
+            const solicitado = item.esFraccion ? item.cantidad : item.cantidad * (item.presentacion.unidadesPorCaja || 1);
+            const current = lotesMap.get(item.lote.id!) || { nombre: item.producto.nombreComercial, solicitado: 0, disponible: item.lote.stockActual };
+            current.solicitado += solicitado;
+            lotesMap.set(item.lote.id!, current);
+        }
+
+        for (const [loteId, data] of lotesMap.entries()) {
+            if (data.solicitado > data.disponible) {
+                this.alertService.error(`Stock insuficiente para "${data.nombre}". Solicitado: ${data.solicitado}, Disponible: ${data.disponible}`);
+                return;
+            }
+        }
 
         // Validación de comprobante (Fase 3)
         if (this.tipoComprobante() === '01' && !this.selectedClienteId()) {

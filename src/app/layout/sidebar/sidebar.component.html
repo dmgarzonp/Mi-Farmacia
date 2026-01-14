@@ -66,6 +66,17 @@
         </li>
         <li>
           <a
+            routerLink="/ventas/caja"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [title]="isCollapsed() ? 'Control de Caja' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.SAVE | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Control de Caja</span>
+          </a>
+        </li>
+        <li>
+          <a
             routerLink="/ventas"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [routerLinkActiveOptions]="{exact: true}"

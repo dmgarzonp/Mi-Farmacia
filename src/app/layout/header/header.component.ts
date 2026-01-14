@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
 import { AuthService } from '../../core/services/auth.service';
+import { ConfirmService } from '../../shared/services/confirm.service';
 
 /**
  * Componente de header/barra superior moderno
@@ -16,6 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class HeaderComponent {
     authService = inject(AuthService);
+    confirmService = inject(ConfirmService);
     title = 'Mi Farmacia';
     icons = APP_ICONS;
 
@@ -26,5 +28,18 @@ export class HeaderComponent {
             month: 'short',
             day: 'numeric'
         });
+    }
+
+    async logout() {
+        const confirmado = await this.confirmService.ask({
+            title: 'Cerrar Sesión',
+            message: '¿Está seguro de que desea salir del sistema?',
+            confirmText: 'Sí, Salir',
+            variant: 'danger'
+        });
+
+        if (confirmado) {
+            this.authService.logout();
+        }
     }
 }

@@ -21,3 +21,4 @@ export const roleGuard = (allowedRoles: RolUsuario[]): CanActivateFn => {
     };
 };
 
+

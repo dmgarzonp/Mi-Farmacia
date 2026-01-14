@@ -205,6 +205,22 @@ function createTables() {
       FOREIGN KEY(cliente_id) REFERENCES clientes(id)
     );
 
+    -- === SESIONES DE CAJA (ARQUEO/TURNOS) ===
+    CREATE TABLE IF NOT EXISTS cajas_sesiones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      fecha_apertura DATETIME DEFAULT CURRENT_TIMESTAMP,
+      fecha_cierre DATETIME,
+      monto_inicial REAL DEFAULT 0,
+      monto_final_efectivo REAL,
+      monto_final_tarjeta REAL,
+      monto_final_transferencia REAL,
+      monto_esperado_efectivo REAL,
+      observaciones TEXT,
+      estado TEXT DEFAULT 'abierta' CHECK(estado IN ('abierta', 'cerrada')),
+      FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
+    );
+
     -- === AUDITORÍA: MOVIMIENTOS DE STOCK ===
     CREATE TABLE IF NOT EXISTS movimientos_stock (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -317,6 +333,17 @@ function createTables() {
         }
     } catch (e) {
         console.error('Error ensuring auth columns in usuarios:', e);
+    }
+
+    // Asegurar columna sesion_caja_id en ventas
+    try {
+        const tableInfoVentas = db.prepare("PRAGMA table_info(ventas)").all();
+        if (!tableInfoVentas.some(col => col.name === 'sesion_caja_id')) {
+            console.log('Adding sesion_caja_id column to ventas...');
+            db.exec('ALTER TABLE ventas ADD COLUMN sesion_caja_id INTEGER;');
+        }
+    } catch (e) {
+        console.error('Error ensuring sesion_caja_id in ventas:', e);
     }
 
     db.exec(schema);
