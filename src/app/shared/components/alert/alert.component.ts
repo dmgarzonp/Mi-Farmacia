@@ -35,19 +35,19 @@ export class AlertService {
         }
     }
 
-    success(message: string, duration = 3000): void {
+    success(message: string, duration = 5000): void {
         this.show('success', message, duration);
     }
 
-    error(message: string, duration = 4000): void {
+    error(message: string, duration = 7000): void {
         this.show('error', message, duration);
     }
 
-    warning(message: string, duration = 3500): void {
+    warning(message: string, duration = 5500): void {
         this.show('warning', message, duration);
     }
 
-    info(message: string, duration = 3000): void {
+    info(message: string, duration = 5000): void {
         this.show('info', message, duration);
     }
 
@@ -74,13 +74,13 @@ export class AlertComponent {
     constructor(public alertService: AlertService) { }
 
     getAlertClasses(type: AlertType): string {
-        const baseClasses = 'min-w-[320px] max-w-md p-4 rounded-lg shadow-premium backdrop-blur-md border border-white/20';
+        const baseClasses = 'w-full p-4 rounded-xl shadow-xl backdrop-blur-md border';
 
         const typeClasses = {
-            success: 'bg-emerald-50/90 text-emerald-900 border-l-4 border-emerald-500',
-            error: 'bg-red-50/90 text-red-900 border-l-4 border-red-500',
-            warning: 'bg-amber-50/90 text-amber-900 border-l-4 border-amber-500',
-            info: 'bg-emerald-50/90 text-emerald-900 border-l-4 border-emerald-500',
+            success: 'bg-emerald-50/95 text-emerald-900 border-emerald-200 border-l-4 border-l-emerald-500',
+            error: 'bg-red-50/95 text-red-900 border-red-200 border-l-4 border-l-red-500',
+            warning: 'bg-amber-50/95 text-amber-900 border-amber-200 border-l-4 border-l-amber-500',
+            info: 'bg-sky-50/95 text-sky-900 border-sky-200 border-l-4 border-l-sky-500',
         };
 
         return `${baseClasses} ${typeClasses[type]}`;

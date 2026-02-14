@@ -128,6 +128,11 @@ function createTables() {
       fecha_emision DATE NOT NULL DEFAULT CURRENT_DATE,
       fecha_requerida DATE,
       estado TEXT DEFAULT 'borrador' CHECK(estado IN ('borrador', 'pendiente', 'aprobada', 'recibida', 'cancelada')),
+      tipo_compra TEXT DEFAULT 'contado' CHECK(tipo_compra IN ('contado', 'credito')),
+      plazo_dias INTEGER,
+      forma_pago TEXT,
+      fecha_vencimiento_pago DATE,
+      fecha_recepcion DATE,
       subtotal REAL NOT NULL CHECK(subtotal >= 0),
       descuento_monto REAL DEFAULT 0 CHECK(descuento_monto >= 0),
       impuesto_total REAL DEFAULT 0 CHECK(impuesto_total >= 0),
@@ -141,6 +146,19 @@ function createTables() {
       FOREIGN KEY(proveedor_id) REFERENCES proveedores(id),
       FOREIGN KEY(creado_por) REFERENCES usuarios(id),
       FOREIGN KEY(aprobado_por) REFERENCES usuarios(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS pagos_compra (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      orden_compra_id INTEGER NOT NULL,
+      monto REAL NOT NULL CHECK(monto > 0),
+      fecha_pago DATE NOT NULL DEFAULT CURRENT_DATE,
+      forma_pago TEXT NOT NULL,
+      referencia TEXT,
+      observaciones TEXT,
+      registrado_por INTEGER,
+      FOREIGN KEY(orden_compra_id) REFERENCES ordenes_compra(id) ON DELETE CASCADE,
+      FOREIGN KEY(registrado_por) REFERENCES usuarios(id)
     );
 
     CREATE TABLE IF NOT EXISTS ordenes_compra_detalles (
@@ -344,6 +362,45 @@ function createTables() {
         }
     } catch (e) {
         console.error('Error ensuring sesion_caja_id in ventas:', e);
+    }
+
+    // Compras: tipo (contado/crédito), plazo_dias, forma de pago, fecha vencimiento, tabla pagos
+    try {
+        const tableInfoOc = db.prepare("PRAGMA table_info(ordenes_compra)").all();
+        if (!tableInfoOc.some(col => col.name === 'tipo_compra')) {
+            console.log('Adding tipo_compra, forma_pago, fecha_vencimiento_pago to ordenes_compra...');
+            db.exec('ALTER TABLE ordenes_compra ADD COLUMN tipo_compra TEXT DEFAULT \'contado\';');
+            db.exec('ALTER TABLE ordenes_compra ADD COLUMN forma_pago TEXT;');
+            db.exec('ALTER TABLE ordenes_compra ADD COLUMN fecha_vencimiento_pago DATE;');
+        }
+        if (!tableInfoOc.some(col => col.name === 'plazo_dias')) {
+            console.log('Adding plazo_dias to ordenes_compra...');
+            db.exec('ALTER TABLE ordenes_compra ADD COLUMN plazo_dias INTEGER;');
+        }
+        if (!tableInfoOc.some(col => col.name === 'fecha_recepcion')) {
+            console.log('Adding fecha_recepcion to ordenes_compra...');
+            db.exec('ALTER TABLE ordenes_compra ADD COLUMN fecha_recepcion DATE;');
+        }
+    } catch (e) {
+        console.error('Error ensuring compras columns:', e);
+    }
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS pagos_compra (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                orden_compra_id INTEGER NOT NULL,
+                monto REAL NOT NULL CHECK(monto > 0),
+                fecha_pago DATE NOT NULL DEFAULT CURRENT_DATE,
+                forma_pago TEXT NOT NULL,
+                referencia TEXT,
+                observaciones TEXT,
+                registrado_por INTEGER,
+                FOREIGN KEY(orden_compra_id) REFERENCES ordenes_compra(id) ON DELETE CASCADE,
+                FOREIGN KEY(registrado_por) REFERENCES usuarios(id)
+            );
+        `);
+    } catch (e) {
+        console.error('Error ensuring pagos_compra table:', e);
     }
 
     db.exec(schema);

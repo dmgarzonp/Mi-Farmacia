@@ -4,6 +4,7 @@ import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
 import { AuthService } from '../../core/services/auth.service';
 import { ConfirmService } from '../../shared/services/confirm.service';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 
 /**
  * Componente de header/barra superior moderno
@@ -11,7 +12,7 @@ import { ConfirmService } from '../../shared/services/confirm.service';
 @Component({
     selector: 'app-header',
     standalone: true,
-    imports: [CommonModule, SafeHtmlPipe],
+    imports: [CommonModule, SafeHtmlPipe, TooltipDirective],
     templateUrl: './header.component.html',
     styles: []
 })

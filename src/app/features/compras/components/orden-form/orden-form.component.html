@@ -29,7 +29,25 @@
     </button>
   </div>
 
-  <form [formGroup]="form" (ngSubmit)="guardar()" class="animate-fade-in">
+  <!-- Aviso: borrador reciente al volver de otra pantalla (ej. venta) -->
+  <div
+    *ngIf="!isEditMode && borradorReciente()"
+    class="mb-6 p-4 rounded-2xl border border-amber-200 bg-amber-50 flex flex-wrap items-center justify-between gap-3 animate-fade-in"
+  >
+    <p class="text-sm font-bold text-amber-800">
+      Tienes un borrador sin terminar (Orden #{{ borradorReciente()?.id }}). ¿Continuar con ese borrador?
+    </p>
+    <div class="flex items-center gap-2">
+      <app-button type="button" variant="secondary" size="sm" (clicked)="descartarBorradorReciente()">
+        No, crear nueva
+      </app-button>
+      <app-button type="button" variant="primary" size="sm" (clicked)="continuarBorradorReciente()" iconNameLeft="EDIT">
+        Continuar borrador
+      </app-button>
+    </div>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="animate-fade-in">
     <div class="flex flex-col xl:flex-row gap-10 items-start">
       
       <!-- Columna Lateral: Configuración y Totales -->
@@ -57,6 +75,53 @@
               formControlName="fechaEmision"
               [required]="true"
             ></app-date-picker>
+
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tipo de compra</label>
+              <div class="relative group">
+                <select formControlName="tipoCompra" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-bold text-slate-700 appearance-none cursor-pointer">
+                  <option [value]="TipoCompra.CONTADO">Contado</option>
+                  <option [value]="TipoCompra.CREDITO">Crédito</option>
+                </select>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <span class="w-4 h-4 block" [innerHTML]="icons.CHEVRON_DOWN | safeHtml"></span>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="form.get('tipoCompra')?.value === TipoCompra.CONTADO">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Forma de pago</label>
+              <div class="relative group">
+                <select formControlName="formaPago" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-bold text-slate-700 appearance-none cursor-pointer">
+                  <option value="">Seleccione...</option>
+                  <option *ngFor="let fp of formasPago" [value]="fp.value">{{ fp.label }}</option>
+                </select>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <span class="w-4 h-4 block" [innerHTML]="icons.CHEVRON_DOWN | safeHtml"></span>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="form.get('tipoCompra')?.value === TipoCompra.CREDITO" class="space-y-3">
+              <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Plazo de venta (días)</label>
+                <div class="relative group">
+                  <select formControlName="plazoDias" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-bold text-slate-700 appearance-none cursor-pointer">
+                    <option [ngValue]="null">Seleccione plazo...</option>
+                    <option *ngFor="let pl of plazosCredito" [ngValue]="pl.value">{{ pl.label }}</option>
+                  </select>
+                  <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <span class="w-4 h-4 block" [innerHTML]="icons.CHEVRON_DOWN | safeHtml"></span>
+                  </div>
+                </div>
+              </div>
+              <div *ngIf="form.get('plazoDias')?.value && form.get('fechaEmision')?.value">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Fecha vencimiento de pago</label>
+                <p class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700">
+                  {{ form.get('fechaVencimientoPago')?.value || '—' }}
+                </p>
+              </div>
+            </div>
 
             <app-input
               label="Observaciones"
@@ -119,35 +184,105 @@
             </div>
 
             <div class="pt-6 space-y-3" *ngIf="!soloLectura">
-              <app-button
-                type="button"
-                variant="secondary"
-                [fullWidth]="true"
-                (clicked)="guardarComoBorrador()"
-                [disabled]="guardando || detalles.length === 0"
-                iconNameLeft="EDIT"
-                class="!bg-slate-50 !border-slate-200 !text-slate-600 hover:!bg-slate-100"
-              >
-                Guardar Borrador
-              </app-button>
-              
-              <app-button
-                type="submit"
-                variant="primary"
-                [fullWidth]="true"
-                [disabled]="form.invalid || guardando || detalles.length === 0"
-                iconNameLeft="SAVE"
-                [loading]="guardando"
-                class="shadow-lg shadow-emerald-500/10"
-              >
-                {{ isEditMode ? 'Actualizar Orden' : 'Confirmar Pedido' }}
-              </app-button>
+              <!-- Nueva orden: Guardar Borrador + Generar Orden -->
+              <ng-container *ngIf="!isEditMode">
+                <app-button
+                  type="button"
+                  variant="secondary"
+                  [fullWidth]="true"
+                  (clicked)="guardarComoBorrador()"
+                  [disabled]="guardando || detalles.length === 0"
+                  iconNameLeft="EDIT"
+                  class="!bg-slate-50 !border-slate-200 !text-slate-600 hover:!bg-slate-100"
+                >
+                  Guardar Borrador
+                </app-button>
+                <app-button
+                  type="button"
+                  variant="primary"
+                  [fullWidth]="true"
+                  (clicked)="generarOrden()"
+                  [disabled]="form.invalid || guardando || detalles.length === 0"
+                  iconNameLeft="SAVE"
+                  [loading]="guardando"
+                  class="shadow-lg shadow-emerald-500/10"
+                >
+                  Generar Orden
+                </app-button>
+              </ng-container>
+              <!-- Orden existente en BORRADOR: Guardar Borrador + Actualizar Orden + Generar Orden -->
+              <ng-container *ngIf="isEditMode && form.get('estado')?.value === EstadoOrdenCompra.BORRADOR">
+                <app-button
+                  type="button"
+                  variant="secondary"
+                  [fullWidth]="true"
+                  (clicked)="guardarComoBorrador()"
+                  [disabled]="guardando || detalles.length === 0"
+                  iconNameLeft="EDIT"
+                  class="!bg-slate-50 !border-slate-200 !text-slate-600 hover:!bg-slate-100"
+                >
+                  Guardar Borrador
+                </app-button>
+                <app-button
+                  type="button"
+                  variant="secondary"
+                  [fullWidth]="true"
+                  (clicked)="actualizarOrden()"
+                  [disabled]="form.invalid || guardando || detalles.length === 0"
+                  iconNameLeft="EDIT"
+                >
+                  Actualizar Orden
+                </app-button>
+                <app-button
+                  type="button"
+                  variant="primary"
+                  [fullWidth]="true"
+                  (clicked)="generarOrden()"
+                  [disabled]="form.invalid || guardando || detalles.length === 0"
+                  iconNameLeft="SAVE"
+                  [loading]="guardando"
+                  class="shadow-lg shadow-emerald-500/10"
+                >
+                  Generar Orden
+                </app-button>
+              </ng-container>
+              <!-- Orden existente PENDIENTE/APROBADA: solo Actualizar Orden -->
+              <ng-container *ngIf="isEditMode && form.get('estado')?.value !== EstadoOrdenCompra.BORRADOR">
+                <app-button
+                  type="button"
+                  variant="primary"
+                  [fullWidth]="true"
+                  (clicked)="actualizarOrden()"
+                  [disabled]="form.invalid || guardando || detalles.length === 0"
+                  iconNameLeft="SAVE"
+                  [loading]="guardando"
+                  class="shadow-lg shadow-emerald-500/10"
+                >
+                  Actualizar Orden
+                </app-button>
+              </ng-container>
             </div>
             
             <div class="pt-6" *ngIf="soloLectura">
               <p class="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
                 Esta orden está en estado final y no permite modificaciones.
               </p>
+            </div>
+
+            <!-- Pagos (solo órdenes a crédito) -->
+            <div *ngIf="isEditMode && form.get('tipoCompra')?.value === TipoCompra.CREDITO" class="pt-6 border-t border-slate-100">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Pagos a crédito</p>
+              <p class="text-sm font-bold text-slate-700 mb-2">Saldo pendiente: <span class="text-amber-700">{{ (ordenCargada()?.saldoPendiente ?? ordenCargada()?.total ?? 0) | currencyFormat }}</span></p>
+              <div class="space-y-2 max-h-32 overflow-y-auto mb-3">
+                <div *ngFor="let p of pagos()" class="flex justify-between text-[10px] bg-slate-50 rounded-lg px-3 py-2">
+                  <span>{{ p.fechaPago }} · {{ p.formaPago }}</span>
+                  <span class="font-black text-slate-800">{{ p.monto | currencyFormat }}</span>
+                </div>
+                <p *ngIf="pagos().length === 0" class="text-[10px] text-slate-400 italic">Sin pagos registrados</p>
+              </div>
+              <app-button type="button" variant="secondary" [fullWidth]="true" (clicked)="openModalPago()" iconNameLeft="ADD" [disabled]="(ordenCargada()?.saldoPendiente ?? 0) <= 0">
+                Registrar pago
+              </app-button>
             </div>
           </div>
         </div>
@@ -198,7 +333,7 @@
             <table class="w-full text-left">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-100">
-                  <th class="px-6 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Presentación / Producto</th>
+                  <th class="px-6 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">Producto / Presentación</th>
                   <th class="px-4 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-28 text-center">Cant. Cajas</th>
                   <th class="px-4 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-36 text-center">Precio x Caja</th>
                   <th class="px-6 py-4 text-[9px] font-black uppercase text-slate-400 tracking-widest w-40 text-right">Subtotal</th>
@@ -210,9 +345,11 @@
                   <tr class="hover:bg-slate-50 transition-colors group">
                     <td class="px-6 py-4 border-b border-slate-50">
                       <div class="flex flex-col">
-                        <span class="font-bold text-slate-700 text-sm leading-tight">{{ getPresentacionNombre(det.get('presentacionId')?.value) }}</span>
-                        <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter mt-1">
+                        <span class="font-black text-emerald-700 text-sm leading-tight">
                           {{ getProductoNombrePorPresentacion(det.get('presentacionId')?.value) }}
+                        </span>
+                        <span class="text-[10px] text-emerald-600/80 font-bold mt-1">
+                          {{ getPresentacionNombre(det.get('presentacionId')?.value) }}
                         </span>
                       </div>
                     </td>
@@ -274,4 +411,42 @@
 
     </div>
   </form>
+
+  <!-- Modal Registrar pago (crédito) -->
+  <app-modal
+    [isOpen]="showModalPago()"
+    title="Registrar pago"
+    size="md"
+    (closed)="closeModalPago()"
+  >
+    <form [formGroup]="formPago" (ngSubmit)="submitPago()" class="space-y-4">
+      <app-input
+        label="Monto"
+        type="number"
+        formControlName="monto"
+        [required]="true"
+        [hasError]="!!(formPago.get('monto')?.invalid && formPago.get('monto')?.touched)"
+      ></app-input>
+      <app-date-picker
+        label="Fecha de pago"
+        formControlName="fechaPago"
+        [required]="true"
+      ></app-date-picker>
+      <div>
+        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Forma de pago</label>
+        <select formControlName="formaPago" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold text-slate-700">
+          <option *ngFor="let fp of formasPago" [value]="fp.value">{{ fp.label }}</option>
+        </select>
+      </div>
+      <app-input
+        label="Referencia (voucher, transferencia...)"
+        formControlName="referencia"
+        placeholder="Opcional"
+      ></app-input>
+      <div class="flex gap-3 pt-4">
+        <app-button type="button" variant="secondary" (clicked)="closeModalPago()">Cancelar</app-button>
+        <app-button type="submit" variant="primary" [loading]="guardandoPago" [disabled]="formPago.invalid">Registrar pago</app-button>
+      </div>
+    </form>
+  </app-modal>
 </div>

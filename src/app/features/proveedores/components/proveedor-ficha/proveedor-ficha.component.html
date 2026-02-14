@@ -1,0 +1,169 @@
+<div class="max-w-5xl mx-auto space-y-8 pb-12">
+  <!-- Cabecera -->
+  <div class="flex items-center justify-between animate-fade-in">
+    <div class="flex items-center gap-4">
+      <button
+        type="button"
+        (click)="volver()"
+        class="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
+      >
+        <span class="w-5 h-5 block" [innerHTML]="icons.BACK | safeHtml"></span>
+      </button>
+      <div>
+        <h1 class="text-2xl font-black text-slate-800 tracking-tight">{{ proveedor()?.nombreEmpresa }}</h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Ficha del proveedor · Saldos y deudas</p>
+      </div>
+    </div>
+    <app-button variant="primary" (clicked)="editar()" iconNameLeft="EDIT">Editar proveedor</app-button>
+  </div>
+
+  <!-- Datos del proveedor (solo lectura) -->
+  <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <h2 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+      <span class="w-1 h-4 bg-emerald-500 rounded-full"></span>
+      Información del proveedor
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <p class="text-[10px] font-black text-slate-400 uppercase">Empresa</p>
+        <p class="text-sm font-bold text-slate-700">{{ proveedor()?.ruc ? 'RUC ' + proveedor()?.ruc : 'Sin RUC' }}</p>
+        <p class="text-sm text-slate-600">{{ proveedor()?.direccion || '—' }}</p>
+        <p class="text-sm text-slate-600">{{ proveedor()?.telefonoEmpresa || '—' }} · {{ proveedor()?.emailEmpresa || '—' }}</p>
+      </div>
+      <div class="space-y-3">
+        <p class="text-[10px] font-black text-slate-400 uppercase">Contacto directo</p>
+        <p class="text-sm font-bold text-slate-700">{{ proveedor()?.nombreContacto || '—' }}</p>
+        <p class="text-[10px] text-slate-500">{{ proveedor()?.cargoContacto || '—' }}</p>
+        <p class="text-sm text-slate-600">{{ proveedor()?.telefonoContacto || '—' }} · {{ proveedor()?.emailContacto || '—' }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saldos y deudas con este proveedor -->
+  <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <h2 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+      <span class="w-1 h-4 bg-amber-500 rounded-full"></span>
+      Saldos y deudas
+    </h2>
+
+    <div *ngIf="loadingCredito()" class="py-8 text-center text-slate-400 text-sm font-bold">Cargando...</div>
+
+    <template *ngIf="!loadingCredito()">
+      <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-6">
+        <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">Total deuda actual</p>
+        <p class="text-2xl font-black text-amber-800">{{ totalDeuda() | currencyFormat }}</p>
+      </div>
+
+      <!-- Órdenes con saldo -->
+      <div class="mb-8">
+        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Órdenes a crédito con saldo</h3>
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-100">
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Nº OC</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Emisión</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Entrega</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase text-right">Total</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase text-right">Saldo</th>
+                <th class="px-4 py-3 w-32"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let o of ordenesCredito()" class="border-b border-slate-50 hover:bg-slate-50/50">
+                <td class="px-4 py-3">
+                  <button type="button" (click)="irAOrden(o.id!)" class="font-black text-slate-800 hover:text-emerald-600">#{{ o.id }}</button>
+                </td>
+                <td class="px-4 py-3 text-slate-600">{{ o.fechaEmision }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ o.fechaRecepcion || '—' }}</td>
+                <td class="px-4 py-3 text-right font-bold text-slate-700">{{ o.total | currencyFormat }}</td>
+                <td class="px-4 py-3 text-right font-black" [class.text-amber-700]="(o.saldoPendiente ?? 0) > 0" [class.text-slate-400]="(o.saldoPendiente ?? 0) === 0">
+                  {{ o.saldoPendiente | currencyFormat }}
+                </td>
+                <td class="px-4 py-3">
+                  <app-button *ngIf="(o.saldoPendiente ?? 0) > 0" type="button" variant="primary" size="sm" (clicked)="openModalPago(o)">Registrar pago</app-button>
+                </td>
+              </tr>
+              <tr *ngIf="ordenesCredito().length === 0">
+                <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-xs font-bold">No hay órdenes a crédito con saldo</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Kardex -->
+      <div>
+        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Kardex (Nº orden y entrega)</h3>
+        <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-72 overflow-y-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 sticky top-0">
+              <tr class="border-b border-slate-100">
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Fecha</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Nº Orden</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Concepto</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Entrega</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase text-right">Débito</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase text-right">Crédito</th>
+                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase text-right">Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let m of kardex()" class="border-b border-slate-50" [class.bg-slate-50/30]="m.tipo === 'pago'">
+                <td class="px-4 py-2 text-slate-600">{{ m.fecha }}</td>
+                <td class="px-4 py-2 font-bold text-slate-700">{{ m.numeroOrden }}</td>
+                <td class="px-4 py-2 text-slate-600">{{ m.concepto }}</td>
+                <td class="px-4 py-2 text-slate-500">{{ m.entrega || '—' }}</td>
+                <td class="px-4 py-2 text-right font-bold" [class.text-slate-800]="m.debito > 0">{{ m.debito > 0 ? (m.debito | currencyFormat) : '—' }}</td>
+                <td class="px-4 py-2 text-right font-bold" [class.text-emerald-600]="m.credito > 0">{{ m.credito > 0 ? (m.credito | currencyFormat) : '—' }}</td>
+                <td class="px-4 py-2 text-right font-black text-slate-800">{{ m.saldo | currencyFormat }}</td>
+              </tr>
+              <tr *ngIf="kardex().length === 0">
+                <td colspan="7" class="px-4 py-8 text-center text-slate-400 text-xs font-bold">Sin movimientos</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- Modal Registrar pago -->
+<app-modal
+  [isOpen]="showModalPago()"
+  title="Registrar pago a crédito"
+  size="md"
+  (closed)="closeModalPago()"
+>
+  <form [formGroup]="formPago" (ngSubmit)="submitPago()" class="space-y-4">
+    <p *ngIf="selectedOrdenPago()" class="text-xs font-bold text-slate-500">Orden #{{ selectedOrdenPago()?.id }} · Saldo: {{ selectedOrdenPago()?.saldoPendiente | currencyFormat }}</p>
+    <app-input
+      label="Monto"
+      type="number"
+      formControlName="monto"
+      [required]="true"
+      [hasError]="!!(formPago.get('monto')?.invalid && formPago.get('monto')?.touched)"
+    ></app-input>
+    <app-date-picker
+      label="Fecha de pago"
+      formControlName="fechaPago"
+      [required]="true"
+    ></app-date-picker>
+    <div>
+      <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Forma de pago</label>
+      <select formControlName="formaPago" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold text-slate-700">
+        <option *ngFor="let fp of formasPago" [value]="fp.value">{{ fp.label }}</option>
+      </select>
+    </div>
+    <app-input
+      label="Referencia (voucher, transferencia...)"
+      formControlName="referencia"
+      placeholder="Opcional"
+    ></app-input>
+    <div class="flex gap-3 pt-4">
+      <app-button type="button" variant="secondary" (clicked)="closeModalPago()">Cancelar</app-button>
+      <app-button type="submit" variant="primary" [loading]="guardandoPago" [disabled]="formPago.invalid">Registrar pago</app-button>
+    </div>
+  </form>
+</app-modal>

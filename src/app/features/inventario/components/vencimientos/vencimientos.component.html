@@ -1,0 +1,423 @@
+<div class="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
+  <!-- Header alineado con el diseño de la aplicación -->
+  <div class="flex items-center justify-between mb-8 animate-fade-in bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+    <div class="flex items-center gap-5">
+      <div class="w-14 h-14 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200">
+        <span class="w-7 h-7" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-black text-slate-900 tracking-tight">
+          Gestión de Vencimientos
+        </h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">
+          Inventario · Productos próximos a vencer y vencidos
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guía rápida y filtro -->
+  <div class="bg-slate-50 border border-slate-100 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-slide-up">
+    <p class="text-sm text-slate-600 leading-relaxed">
+      <span class="font-bold text-slate-800">Qué puede hacer:</span>
+      Venda primero desde el Punto de Venta (el sistema usa FEFO y prioriza el lote que vence primero).
+      Si no puede venderlo a tiempo, use las acciones de cada lote para <strong class="text-slate-800">marcar como vencido</strong> o <strong class="text-slate-800">devolver al proveedor</strong>.
+    </p>
+    <div class="flex-shrink-0 flex items-center gap-3">
+      <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Días de anticipación</label>
+      <select
+        [ngModel]="diasFiltro()"
+        (ngModelChange)="onDiasFiltroChange($event)"
+        class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+      >
+        <option [value]="15">15 días</option>
+        <option [value]="30">30 días</option>
+        <option [value]="60">60 días</option>
+        <option [value]="90">90 días</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="flex border-b border-gray-200">
+      <button
+        (click)="cambiarTab('proximos')"
+        [class]="activaTab() === 'proximos' 
+          ? 'px-8 py-4 bg-primary-50 text-primary-700 font-black border-b-2 border-primary-500' 
+          : 'px-8 py-4 text-gray-500 hover:text-gray-700 font-bold hover:bg-gray-50 transition-colors'"
+      >
+        <span class="flex items-center gap-2">
+          <span class="w-5 h-5" [innerHTML]="icons.ALERT | safeHtml"></span>
+          Próximos a Vencer
+          <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-black">
+            {{ totalProximos() }}
+          </span>
+        </span>
+      </button>
+      <button
+        (click)="cambiarTab('vencidos')"
+        [class]="activaTab() === 'vencidos' 
+          ? 'px-8 py-4 bg-primary-50 text-primary-700 font-black border-b-2 border-primary-500' 
+          : 'px-8 py-4 text-gray-500 hover:text-gray-700 font-bold hover:bg-gray-50 transition-colors'"
+      >
+        <span class="flex items-center gap-2">
+          <span class="w-5 h-5" [class.text-red-500]="totalVencidos() > 0" [innerHTML]="icons.ERROR | safeHtml"></span>
+          <span [class.text-red-600]="totalVencidos() > 0 && activaTab() === 'vencidos'" [class.text-gray-500]="totalVencidos() === 0 || activaTab() !== 'vencidos'">Vencidos</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-black" 
+                [class.bg-red-100]="totalVencidos() > 0" 
+                [class.text-red-700]="totalVencidos() > 0"
+                [class.bg-gray-100]="totalVencidos() === 0"
+                [class.text-gray-500]="totalVencidos() === 0">
+            {{ totalVencidos() }}
+          </span>
+        </span>
+      </button>
+    </div>
+
+    <!-- Tab: Próximos a Vencer -->
+    <div *ngIf="activaTab() === 'proximos'" class="p-8">
+      <!-- Resumen -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-blue-50 border border-blue-100 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Productos</span>
+            <span class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+              <span class="w-5 h-5" [innerHTML]="icons.BOXES | safeHtml"></span>
+            </span>
+          </div>
+          <p class="text-3xl font-black text-blue-700">{{ totalProximos() }}</p>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-black text-amber-400 uppercase tracking-widest">Stock Total</span>
+            <span class="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+              <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+            </span>
+          </div>
+          <p class="text-3xl font-black text-amber-700">{{ stockTotalProximos() }}</p>
+          <p class="text-xs text-amber-600 font-bold uppercase mt-1">Unidades</p>
+        </div>
+        <div class="bg-primary-50 border border-primary-100 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest">Período</span>
+            <span class="w-10 h-10 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
+              <span class="w-5 h-5" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+            </span>
+          </div>
+          <p class="text-2xl font-black text-primary-700">{{ diasFiltro() }} días</p>
+          <p class="text-xs text-primary-600 font-bold uppercase mt-1">Anticipación</p>
+        </div>
+      </div>
+
+      <!-- Tabla -->
+      <app-table
+        [columns]="columnsProximos"
+        [data]="productosProximos()"
+        [loading]="loading()"
+        emptyMessage="No hay productos próximos a vencer en el período seleccionado"
+        [actions]="getActionsProximos()"
+      ></app-table>
+    </div>
+
+    <!-- Tab: Vencidos -->
+    <div *ngIf="activaTab() === 'vencidos'" class="p-8">
+      <!-- Resumen -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="bg-primary-50 border border-primary-100 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest">Total Productos</span>
+            <span class="w-10 h-10 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
+              <span class="w-5 h-5" [innerHTML]="icons.ERROR | safeHtml"></span>
+            </span>
+          </div>
+          <p class="text-3xl font-black" [class.text-red-600]="totalVencidos() > 0" [class.text-primary-700]="totalVencidos() === 0">{{ totalVencidos() }}</p>
+          <p *ngIf="totalVencidos() > 0" class="text-xs text-red-600 font-bold uppercase mt-1">⚠️ Requiere Atención</p>
+        </div>
+        <div class="bg-primary-50 border border-primary-100 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest">Stock Total</span>
+            <span class="w-10 h-10 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center">
+              <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
+            </span>
+          </div>
+          <p class="text-3xl font-black" [class.text-red-600]="stockTotalVencidos() > 0" [class.text-primary-700]="stockTotalVencidos() === 0">{{ stockTotalVencidos() }}</p>
+          <p class="text-xs font-bold uppercase mt-1" [class.text-red-600]="stockTotalVencidos() > 0" [class.text-primary-600]="stockTotalVencidos() === 0">Unidades Vencidas</p>
+        </div>
+      </div>
+
+      <!-- Tabla -->
+      <app-table
+        [columns]="columnsVencidos"
+        [data]="productosVencidos()"
+        [loading]="loading()"
+        emptyMessage="No hay productos vencidos con stock"
+        [actions]="getActionsVencidos()"
+      ></app-table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Marcar Vencido -->
+<app-modal
+  [isOpen]="mostrarModalVencido()"
+  title="Marcar Lote como Vencido"
+  size="md"
+  (closed)="cancelarMarcarVencido()"
+>
+  <div class="modal-body space-y-4">
+    <div *ngIf="loteSeleccionado()" class="space-y-4">
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <h4 class="text-sm font-black text-gray-900 mb-3 uppercase tracking-wider">Información del Lote</h4>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Producto:</span>
+            <span class="text-gray-900 font-black">{{ loteSeleccionado()!.productoNombre }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Presentación:</span>
+            <span class="text-gray-900 font-black">{{ loteSeleccionado()!.presentacionNombre }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Lote:</span>
+            <span class="text-gray-900 font-black font-mono">{{ loteSeleccionado()!.lote }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Fecha Vencimiento:</span>
+            <span class="text-red-600 font-black">{{ loteSeleccionado()!.fechaVencimiento | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-gray-200">
+            <span class="text-gray-600 font-bold">Stock Actual:</span>
+            <span class="text-lg font-black text-red-600">{{ loteSeleccionado()!.stockActual }} {{ loteSeleccionado()!.unidadBase }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <p class="text-xs font-black text-amber-800 uppercase tracking-wider mb-2">⚠️ Advertencia</p>
+        <p class="text-sm text-amber-700">
+          Al marcar este lote como vencido, se ajustará automáticamente el stock a <strong class="text-red-600">0 unidades</strong> 
+          y se registrará un movimiento de tipo "Vencimiento" en el historial.
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">
+          Motivo del Vencimiento <span class="text-red-500">*</span>
+        </label>
+        <textarea
+          [(ngModel)]="motivoVencimiento"
+          rows="3"
+          placeholder="Describa el motivo del vencimiento (mínimo 5 caracteres)..."
+          class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-all duration-500 focus:outline-none text-sm placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-1 ml-1">Este motivo quedará registrado en el historial de movimientos</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer flex justify-end gap-3 pt-6 border-t border-gray-200">
+    <app-button variant="secondary" (clicked)="cancelarMarcarVencido()" [disabled]="loading()">
+      Cancelar
+    </app-button>
+    <app-button variant="primary" (clicked)="confirmarMarcarVencido()" [disabled]="loading() || !motivoVencimiento().trim() || motivoVencimiento().trim().length < 5" iconNameLeft="CHECK">
+      Marcar como Vencido
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Modal para Devolución al Proveedor -->
+<app-modal
+  [isOpen]="mostrarModalDevolucion()"
+  title="Devolver al Proveedor"
+  size="lg"
+  (closed)="cancelarDevolucion()"
+>
+  <div class="modal-body space-y-4">
+    <div *ngIf="loteSeleccionado()" class="space-y-4">
+      <!-- Información del Lote -->
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <h4 class="text-sm font-black text-gray-900 mb-3 uppercase tracking-wider">Información del Lote</h4>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Producto:</span>
+            <span class="text-gray-900 font-black">{{ loteSeleccionado()!.productoNombre }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Presentación:</span>
+            <span class="text-gray-900 font-black">{{ loteSeleccionado()!.presentacionNombre }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Lote:</span>
+            <span class="text-gray-900 font-black font-mono">{{ loteSeleccionado()!.lote }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 font-bold">Fecha Vencimiento:</span>
+            <span class="text-amber-600 font-black">{{ loteSeleccionado()!.fechaVencimiento | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-gray-200">
+            <span class="text-gray-600 font-bold">Stock Actual:</span>
+            <span class="text-lg font-black text-primary-700">{{ loteSeleccionado()!.stockActual }} {{ loteSeleccionado()!.unidadBase }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Información del Proveedor -->
+      <div *ngIf="proveedorInfo()" class="bg-primary-50 border border-primary-200 rounded-xl p-4">
+        <h4 class="text-sm font-black text-primary-900 mb-3 uppercase tracking-wider">Proveedor</h4>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-primary-600 font-bold">Empresa:</span>
+            <span class="text-primary-900 font-black">{{ proveedorInfo()!.proveedorNombre }}</span>
+          </div>
+          <div *ngIf="proveedorInfo()!.proveedorRuc" class="flex justify-between">
+            <span class="text-primary-600 font-bold">RUC:</span>
+            <span class="text-primary-900 font-black">{{ proveedorInfo()!.proveedorRuc }}</span>
+          </div>
+          <div *ngIf="proveedorInfo()!.proveedorEmail" class="flex justify-between">
+            <span class="text-primary-600 font-bold">Email:</span>
+            <span class="text-primary-900 font-black">{{ proveedorInfo()!.proveedorEmail }}</span>
+          </div>
+          <div *ngIf="proveedorInfo()!.ordenCompraId" class="flex justify-between pt-2 border-t border-primary-200">
+            <span class="text-primary-600 font-bold">Orden de Compra:</span>
+            <span class="text-primary-900 font-black">#{{ proveedorInfo()!.ordenCompraId }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="!proveedorInfo()" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <p class="text-xs font-black text-amber-800 uppercase tracking-wider mb-2">⚠️ Información</p>
+        <p class="text-sm text-amber-700">
+          No se encontró información del proveedor para este lote. Puede continuar con la devolución manualmente.
+        </p>
+      </div>
+
+      <!-- Cantidad a Devolver -->
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">
+          Cantidad a Devolver <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="number"
+          [value]="cantidadDevolver()"
+          (input)="cantidadDevolver.set(+$any($event.target).value)"
+          [min]="1"
+          [max]="loteSeleccionado()?.stockActual || 0"
+          [class.border-red-500]="cantidadDevolver() <= 0 || cantidadDevolver() > (loteSeleccionado()?.stockActual || 0)"
+          class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-all duration-500 focus:outline-none text-sm placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        />
+        <p *ngIf="cantidadDevolver() > (loteSeleccionado()?.stockActual || 0)" class="text-xs text-red-500 mt-1 ml-1">
+          No puede devolver más del stock disponible
+        </p>
+        <p *ngIf="cantidadDevolver() <= 0" class="text-xs text-red-500 mt-1 ml-1">
+          La cantidad debe ser mayor a 0
+        </p>
+        <p class="text-xs text-gray-500 mt-1 ml-1">
+          Stock disponible: <strong>{{ loteSeleccionado()?.stockActual }} {{ loteSeleccionado()?.unidadBase }}</strong>
+        </p>
+      </div>
+
+      <!-- Motivo -->
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">
+          Motivo de la Devolución <span class="text-red-500">*</span>
+        </label>
+        <textarea
+          [(ngModel)]="motivoDevolucion"
+          rows="3"
+          placeholder="Describa el motivo de la devolución (mínimo 5 caracteres)..."
+          class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-all duration-500 focus:outline-none text-sm placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-1 ml-1">Este motivo quedará registrado en el historial de movimientos</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer flex justify-end gap-3 pt-6 border-t border-gray-200">
+    <app-button variant="secondary" (clicked)="cancelarDevolucion()" [disabled]="loading()">
+      Cancelar
+    </app-button>
+    <app-button variant="primary" (clicked)="confirmarDevolucion()" [disabled]="loading() || !motivoDevolucion().trim() || motivoDevolucion().trim().length < 5 || cantidadDevolver() <= 0 || cantidadDevolver() > (loteSeleccionado()?.stockActual || 0)" iconNameLeft="CHECK">
+      Confirmar Devolución
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Modal para Enviar Correo al Proveedor -->
+<app-modal
+  [isOpen]="mostrarModalCorreo()"
+  title="Enviar Correo al Proveedor"
+  size="xl"
+  (closed)="cancelarCorreo()"
+>
+  <div class="modal-body space-y-4">
+    <div *ngIf="loteSeleccionado() && proveedorInfo()" class="space-y-4">
+      <!-- Información del Proveedor -->
+      <div class="bg-primary-50 border border-primary-200 rounded-xl p-4">
+        <h4 class="text-sm font-black text-primary-900 mb-3 uppercase tracking-wider">Destinatario</h4>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-primary-600 font-bold">Empresa:</span>
+            <span class="text-primary-900 font-black">{{ proveedorInfo()!.proveedorNombre }}</span>
+          </div>
+          <div *ngIf="proveedorInfo()!.nombreContacto" class="flex justify-between">
+            <span class="text-primary-600 font-bold">Contacto:</span>
+            <span class="text-primary-900 font-black">{{ proveedorInfo()!.nombreContacto }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Email Destino -->
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">
+          Correo Electrónico de Destino <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="email"
+          [value]="emailDestino()"
+          (input)="emailDestino.set($any($event.target).value)"
+          placeholder="correo@proveedor.com"
+          [class.border-red-500]="!emailDestino().trim() || !emailDestino().includes('@')"
+          class="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg transition-all duration-500 focus:outline-none text-sm placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        />
+        <p *ngIf="!emailDestino().trim() || !emailDestino().includes('@')" class="text-xs text-red-500 mt-1 ml-1">
+          {{ !emailDestino().includes('@') ? 'Ingrese un correo electrónico válido' : 'El correo es obligatorio' }}
+        </p>
+      </div>
+
+      <!-- Plantilla del Correo -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
+            Plantilla del Correo
+          </label>
+          <app-button variant="secondary" (clicked)="copiarPlantilla()" iconNameLeft="COPY" class="text-xs">
+            Copiar
+          </app-button>
+        </div>
+        <textarea
+          [value]="plantillaCorreo()"
+          (input)="plantillaCorreo.set($any($event.target).value)"
+          rows="12"
+          class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-700 resize-none"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-1 ml-1">Puede editar el contenido antes de enviar</p>
+      </div>
+    </div>
+
+    <div *ngIf="!proveedorInfo()" class="bg-red-50 border border-red-200 rounded-xl p-4">
+      <p class="text-sm text-red-700">
+        No se encontró información del proveedor para este lote. No se puede generar el correo.
+      </p>
+    </div>
+  </div>
+
+  <div class="modal-footer flex justify-end gap-3 pt-6 border-t border-gray-200">
+    <app-button variant="secondary" (clicked)="cancelarCorreo()" [disabled]="loading()">
+      Cancelar
+    </app-button>
+    <app-button variant="primary" (clicked)="enviarCorreo()" [disabled]="loading() || !emailDestino().trim() || !emailDestino().includes('@') || !proveedorInfo()" iconNameLeft="UPLOAD">
+      Abrir Cliente de Correo
+    </app-button>
+  </div>
+</app-modal>

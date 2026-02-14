@@ -1,6 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { DatabaseService } from '../../../core/services/database.service';
-import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, TipoMovimiento } from '../../../core/models';
+import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, TipoMovimiento, PagoCompra } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 
 /**
@@ -26,7 +26,8 @@ export class ComprasService {
             const sql = `
                 SELECT 
                     oc.*,
-                    p.nombre_empresa as proveedor_nombre
+                    p.nombre_empresa as proveedor_nombre,
+                    (oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)) as saldo_pendiente
                 FROM ordenes_compra oc
                 LEFT JOIN proveedores p ON oc.proveedor_id = p.id
                 ORDER BY oc.fecha_emision DESC
@@ -72,6 +73,12 @@ export class ComprasService {
             const ordenCompleta = this.db.toCamelCase(orden) as OrdenCompra;
             ordenCompleta.detalles = this.db.toCamelCase(detalles) as DetalleOrdenCompra[];
 
+            // Saldo pendiente para crédito (total - suma de pagos)
+            const saldoSql = `SELECT COALESCE(SUM(monto), 0) as total_pagado FROM pagos_compra WHERE orden_compra_id = ?`;
+            const saldoRow = await this.db.get<any>(saldoSql, [id]);
+            const totalPagado = saldoRow ? (saldoRow.totalPagado ?? saldoRow.total_pagado ?? 0) : 0;
+            ordenCompleta.saldoPendiente = (ordenCompleta.total || 0) - totalPagado;
+
             return ordenCompleta;
         } catch (err: any) {
             console.error('Error obteniendo orden:', err);
@@ -88,16 +95,20 @@ export class ComprasService {
             const usuarioId = this.authService.usuarioActual()?.id || null;
             const ordenSql = `
                 INSERT INTO ordenes_compra (
-                    proveedor_id, fecha_emision, estado, subtotal, 
-                    descuento_monto, impuesto_total, total, moneda, observaciones, creado_por
+                    proveedor_id, fecha_emision, estado, tipo_compra, plazo_dias, forma_pago, fecha_vencimiento_pago,
+                    subtotal, descuento_monto, impuesto_total, total, moneda, observaciones, creado_por
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const result = await this.db.run(ordenSql, [
                 Number(orden.proveedorId),
                 orden.fechaEmision || new Date().toISOString().split('T')[0],
                 orden.estado || EstadoOrdenCompra.PENDIENTE,
+                orden.tipoCompra || 'contado',
+                orden.plazoDias ?? null,
+                orden.formaPago || null,
+                orden.fechaVencimientoPago || null,
                 Number(orden.subtotal) || 0,
                 Number(orden.descuentoMonto) || 0,
                 Number(orden.impuestoTotal) || 0,
@@ -147,8 +158,8 @@ export class ComprasService {
         try {
             const sql = `
                 UPDATE ordenes_compra 
-                SET proveedor_id = ?, fecha_emision = ?, estado = ?, subtotal = ?, 
-                    descuento_monto = ?, impuesto_total = ?, total = ?, observaciones = ?
+                SET proveedor_id = ?, fecha_emision = ?, estado = ?, tipo_compra = ?, plazo_dias = ?, forma_pago = ?, fecha_vencimiento_pago = ?,
+                    subtotal = ?, descuento_monto = ?, impuesto_total = ?, total = ?, observaciones = ?
                 WHERE id = ?
             `;
 
@@ -156,6 +167,10 @@ export class ComprasService {
                 Number(orden.proveedorId),
                 orden.fechaEmision,
                 orden.estado,
+                orden.tipoCompra ?? 'contado',
+                orden.plazoDias ?? null,
+                orden.formaPago ?? null,
+                orden.fechaVencimientoPago ?? null,
                 Number(orden.subtotal) || 0,
                 Number(orden.descuentoMonto) || 0,
                 Number(orden.impuestoTotal) || 0,
@@ -211,11 +226,239 @@ export class ComprasService {
         try {
             const sql = `UPDATE ordenes_compra SET estado = ?, observaciones = ? WHERE id = ?`;
             await this.db.run(sql, [estado, motivo || null, id]);
-            await this.db.run(sql, [estado, motivo || null, id]);
             await this.cargarOrdenes();
         } catch (err: any) {
             console.error('Error cambiando estado:', err);
             throw err;
+        }
+    }
+
+    /**
+     * Órdenes a crédito con saldo pendiente, para vista "Saldos de cancelación".
+     */
+    async obtenerOrdenesConSaldoPendiente(filtros?: { proveedorId?: number; plazoDias?: number }): Promise<(OrdenCompra & { diasRestantes?: number; diasVencido?: number })[]> {
+        try {
+            let sql = `
+                SELECT 
+                    oc.*,
+                    p.nombre_empresa as proveedor_nombre,
+                    (oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)) as saldo_pendiente
+                FROM ordenes_compra oc
+                LEFT JOIN proveedores p ON oc.proveedor_id = p.id
+                WHERE oc.tipo_compra = 'credito'
+                AND (oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)) > 0
+            `;
+            const params: any[] = [];
+            if (filtros?.proveedorId != null) {
+                sql += ` AND oc.proveedor_id = ?`;
+                params.push(filtros.proveedorId);
+            }
+            if (filtros?.plazoDias != null) {
+                sql += ` AND oc.plazo_dias = ?`;
+                params.push(filtros.plazoDias);
+            }
+            sql += ` ORDER BY oc.fecha_vencimiento_pago IS NULL, oc.fecha_vencimiento_pago ASC, oc.id DESC`;
+            const rows = await this.db.query<any>(sql, params);
+            const list = this.db.toCamelCase(rows) as (OrdenCompra & { diasRestantes?: number; diasVencido?: number })[];
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            for (const o of list) {
+                if (o.fechaVencimientoPago) {
+                    const ven = new Date(o.fechaVencimientoPago);
+                    ven.setHours(0, 0, 0, 0);
+                    const diff = Math.floor((ven.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diff >= 0) o.diasRestantes = diff;
+                    else o.diasVencido = -diff;
+                }
+            }
+            return list;
+        } catch (err: any) {
+            console.error('Error obteniendo órdenes con saldo:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Obtiene los pagos (abonos) registrados para una orden de compra (crédito).
+     */
+    async obtenerPagos(ordenCompraId: number): Promise<PagoCompra[]> {
+        try {
+            const sql = `
+                SELECT * FROM pagos_compra WHERE orden_compra_id = ? ORDER BY fecha_pago DESC
+            `;
+            const rows = await this.db.query<any>(sql, [ordenCompraId]);
+            return this.db.toCamelCase(rows) as PagoCompra[];
+        } catch (err: any) {
+            console.error('Error obteniendo pagos:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Registra un pago (abono) contra una orden a crédito. Valida que el total pagado no supere el total de la orden.
+     */
+    async registrarPago(ordenCompraId: number, pago: Partial<PagoCompra>): Promise<number> {
+        try {
+            const orden = await this.obtenerPorId(ordenCompraId);
+            if (!orden) throw new Error('Orden no encontrada');
+            const saldo = orden.saldoPendiente ?? orden.total ?? 0;
+            if (Number(pago.monto || 0) <= 0) throw new Error('El monto del pago debe ser mayor a 0');
+            if (Number(pago.monto || 0) > saldo) {
+                throw new Error('El monto del pago supera el saldo pendiente de la orden');
+            }
+            const usuarioId = this.authService.usuarioActual()?.id || null;
+            const sql = `
+                INSERT INTO pagos_compra (orden_compra_id, monto, fecha_pago, forma_pago, referencia, observaciones, registrado_por)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `;
+            const result = await this.db.run(sql, [
+                ordenCompraId,
+                Number(pago.monto),
+                pago.fechaPago || new Date().toISOString().split('T')[0],
+                pago.formaPago || 'efectivo',
+                pago.referencia || null,
+                pago.observaciones || null,
+                usuarioId
+            ]);
+            await this.cargarOrdenes();
+            return result.lastInsertRowid;
+        } catch (err: any) {
+            console.error('Error registrando pago:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Actualiza forma de pago (y opcionalmente registra pago total) en la orden. Usado al recibir mercancía al contado.
+     */
+    async actualizarFormaPago(ordenCompraId: number, formaPago: string, referencia?: string): Promise<void> {
+        try {
+            await this.db.run(
+                `UPDATE ordenes_compra SET forma_pago = ? WHERE id = ?`,
+                [formaPago, ordenCompraId]
+            );
+            const orden = await this.obtenerPorId(ordenCompraId);
+            if (orden && orden.total != null && orden.total > 0) {
+                await this.registrarPago(ordenCompraId, {
+                    ordenCompraId,
+                    monto: orden.total,
+                    fechaPago: new Date().toISOString().split('T')[0],
+                    formaPago,
+                    referencia
+                });
+            }
+            await this.cargarOrdenes();
+        } catch (err: any) {
+            console.error('Error actualizando forma de pago:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Órdenes a crédito de un proveedor (con o sin saldo), para ficha proveedor.
+     */
+    async obtenerOrdenesCreditoPorProveedor(proveedorId: number): Promise<(OrdenCompra & { diasRestantes?: number; diasVencido?: number })[]> {
+        try {
+            const sql = `
+                SELECT 
+                    oc.*,
+                    p.nombre_empresa as proveedor_nombre,
+                    (oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)) as saldo_pendiente
+                FROM ordenes_compra oc
+                LEFT JOIN proveedores p ON oc.proveedor_id = p.id
+                WHERE oc.proveedor_id = ? AND oc.tipo_compra = 'credito'
+                ORDER BY oc.fecha_emision DESC
+            `;
+            const rows = await this.db.query<any>(sql, [proveedorId]);
+            const list = this.db.toCamelCase(rows) as (OrdenCompra & { diasRestantes?: number; diasVencido?: number })[];
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            for (const o of list) {
+                if (o.fechaVencimientoPago) {
+                    const ven = new Date(o.fechaVencimientoPago);
+                    ven.setHours(0, 0, 0, 0);
+                    const diff = Math.floor((ven.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diff >= 0) o.diasRestantes = diff;
+                    else o.diasVencido = -diff;
+                }
+            }
+            return list;
+        } catch (err: any) {
+            console.error('Error obteniendo órdenes crédito por proveedor:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Kardex de saldos a crédito con un proveedor: movimientos (compra + pagos) ordenados por fecha con saldo acumulado.
+     */
+    async obtenerMovimientosKardexProveedor(proveedorId: number): Promise<{ fecha: string; tipo: 'compra' | 'pago'; ordenId: number; numeroOrden: string; concepto: string; entrega?: string; debito: number; credito: number; saldo: number }[]> {
+        try {
+            const ordenes = await this.obtenerOrdenesCreditoPorProveedor(proveedorId);
+            const movs: { fecha: string; tipo: 'compra' | 'pago'; ordenId: number; numeroOrden: string; concepto: string; entrega?: string; debito: number; credito: number; saldo: number }[] = [];
+            for (const oc of ordenes) {
+                movs.push({
+                    fecha: oc.fechaEmision || '',
+                    tipo: 'compra',
+                    ordenId: oc.id!,
+                    numeroOrden: `OC-${oc.id}`,
+                    concepto: `Compra orden #${oc.id}`,
+                    entrega: oc.fechaRecepcion || undefined,
+                    debito: oc.total || 0,
+                    credito: 0,
+                    saldo: 0
+                });
+                const pagos = await this.obtenerPagos(oc.id!);
+                for (const p of pagos) {
+                    movs.push({
+                        fecha: p.fechaPago,
+                        tipo: 'pago',
+                        ordenId: oc.id!,
+                        numeroOrden: `OC-${oc.id}`,
+                        concepto: `Pago ${p.formaPago}${p.referencia ? ' ' + p.referencia : ''}`,
+                        debito: 0,
+                        credito: p.monto,
+                        saldo: 0
+                    });
+                }
+            }
+            movs.sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.tipo === 'compra' ? -1 : 1));
+            let saldoAcum = 0;
+            for (const m of movs) {
+                saldoAcum += m.debito - m.credito;
+                m.saldo = saldoAcum;
+            }
+            return movs;
+        } catch (err: any) {
+            console.error('Error obteniendo kardex proveedor:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Total deuda (saldo pendiente) con un proveedor (suma de saldos de órdenes a crédito).
+     */
+    async obtenerTotalDeudaProveedor(proveedorId: number): Promise<number> {
+        try {
+            const ordenes = await this.obtenerOrdenesConSaldoPendiente({ proveedorId });
+            return ordenes.reduce((acc, o) => acc + (o.saldoPendiente ?? 0), 0);
+        } catch (err: any) {
+            console.error('Error obteniendo total deuda proveedor:', err);
+            return 0;
+        }
+    }
+
+    /**
+     * Obtiene el ID del primer proveedor activo (para órdenes sin proveedor asignado, ej. desde Lista de Faltantes)
+     */
+    async obtenerPrimerProveedorActivo(): Promise<number | null> {
+        try {
+            const sql = `SELECT id FROM proveedores WHERE estado = 'activo' ORDER BY nombre_empresa ASC LIMIT 1`;
+            const row = await this.db.get<{ id: number }>(sql);
+            return row?.id ?? null;
+        } catch (err) {
+            console.error('Error obteniendo primer proveedor:', err);
+            return null;
         }
     }
 
@@ -250,8 +493,15 @@ export class ComprasService {
      * 3. Crea/Actualiza lotes en inventario (Basado en presentaciones)
      * 4. Registra movimientos de stock para auditoría
      * 5. Cambia estado de la orden
+     * 6. Si es contado y se pasan formaPago/referenciaPago, actualiza forma de pago y registra pago por el total.
      */
-    async marcarComoRecibida(id: number, detallesActualizados: DetalleOrdenCompra[], nuevoTotal?: number): Promise<void> {
+    async marcarComoRecibida(
+        id: number,
+        detallesActualizados: DetalleOrdenCompra[],
+        nuevoTotal?: number,
+        formaPago?: string,
+        referenciaPago?: string
+    ): Promise<void> {
         try {
             const orden = await this.obtenerPorId(id);
             if (!orden || !orden.detalles) throw new Error('Orden no encontrada');
@@ -342,6 +592,14 @@ export class ComprasService {
             }
 
             await this.cambiarEstado(id, EstadoOrdenCompra.RECIBIDA);
+            const hoy = new Date().toISOString().split('T')[0];
+            await this.db.run(`UPDATE ordenes_compra SET fecha_recepcion = ? WHERE id = ?`, [hoy, id]);
+
+            if (formaPago && orden.tipoCompra === 'credito') {
+                // Para crédito no registramos pago total aquí; el usuario usa "Registrar pago" en el detalle
+            } else if (formaPago) {
+                await this.actualizarFormaPago(id, formaPago, referenciaPago);
+            }
         } catch (err: any) {
             console.error('Error en recepción:', err);
             throw err;

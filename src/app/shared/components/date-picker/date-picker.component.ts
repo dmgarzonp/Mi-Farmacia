@@ -46,11 +46,11 @@ export class DatePickerComponent implements ControlValueAccessor {
     onTouched: any = () => { };
 
     get inputClasses(): string {
-        const baseClasses = 'w-full px-4 py-3 bg-white border rounded-2xl transition-all duration-500 focus:outline-none text-sm appearance-none shadow-sm';
+        const baseClasses = 'w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl transition-all focus:outline-none text-sm font-bold text-slate-800 appearance-none';
         const stateClasses = this.hasError
-            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
-            : 'border-gray-100 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 hover:border-primary-200 hover:shadow-md';
-        const disabledClasses = (this.disabled || this.isReadOnly) ? 'bg-gray-50/50 backdrop-blur-sm text-gray-500 cursor-not-allowed border-gray-200 shadow-none' : '';
+            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+            : 'focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 hover:border-slate-300';
+        const disabledClasses = (this.disabled || this.isReadOnly) ? 'bg-slate-50/50 text-slate-500 cursor-not-allowed border-slate-200' : '';
 
         return `${baseClasses} ${stateClasses} ${disabledClasses}`;
     }

@@ -1,36 +1,33 @@
 <div class="max-w-6xl mx-auto space-y-8 pb-12">
-  <!-- Header del Producto -->
-  <div class="bg-primary-900 text-white p-10 rounded-[2.5rem] shadow-premium relative overflow-hidden animate-fade-in">
-    <!-- Decoración visual -->
-    <div class="absolute -right-10 -top-10 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl animate-pulse"></div>
-    
-    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-      <div class="flex items-center gap-6">
-        <div class="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center border border-white/10 shadow-inner">
-          <span class="w-10 h-10 text-primary-300" [innerHTML]="icons.BOXES | safeHtml"></span>
-        </div>
-        <div>
-          <div class="flex items-center gap-3 mb-2">
-            <span class="px-2 py-0.5 bg-primary-500 text-primary-950 text-[10px] font-black rounded-md uppercase tracking-widest">Kardex de Inventario</span>
-            <span *ngIf="producto()?.codigoInterno" class="text-primary-400 text-[10px] font-bold uppercase tracking-widest opacity-60">SKU: {{ producto()?.codigoInterno }}</span>
-          </div>
-          <h1 class="text-4xl font-black tracking-tight leading-none mb-2">{{ producto()?.nombreComercial }}</h1>
-          <p class="text-primary-200/70 font-medium uppercase tracking-widest text-[11px]">
-            {{ producto()?.principioActivo || 'Sin principio activo' }} | {{ producto()?.laboratorioNombre || 'Sin Laboratorio' }}
-          </p>
-        </div>
+  <!-- Header alineado con el diseño de la aplicación -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 animate-fade-in bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+    <div class="flex items-center gap-5">
+      <div class="w-14 h-14 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200">
+        <span class="w-7 h-7" [innerHTML]="icons.BOXES | safeHtml"></span>
       </div>
+      <div>
+        <h1 class="text-3xl font-black text-slate-900 tracking-tight">
+          {{ producto()?.nombreComercial }}
+        </h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">
+          Kardex de inventario
+          <span *ngIf="producto()?.codigoInterno"> · SKU: {{ producto()?.codigoInterno }}</span>
+        </p>
+        <p class="text-xs text-slate-500 mt-1">
+          {{ producto()?.principioActivo || 'Sin principio activo' }} · {{ producto()?.laboratorioNombre || 'Sin laboratorio' }}
+        </p>
+      </div>
+    </div>
 
-      <div class="flex flex-col items-end gap-2">
-        <div class="bg-white/5 backdrop-blur-sm px-6 py-4 rounded-3xl border border-white/5 flex flex-col items-end">
-          <span class="text-[10px] font-black text-primary-400 uppercase tracking-widest mb-1">Stock Consolidado</span>
-          <div class="flex items-baseline gap-2">
-            <span class="text-4xl font-black text-white">{{ totalStockConsolidado() }}</span>
-            <span class="text-sm font-bold text-primary-300 uppercase tracking-widest">Unidades</span>
-          </div>
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div class="bg-slate-50 border border-slate-100 px-5 py-3 rounded-xl flex flex-col items-end">
+        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Stock consolidado</span>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-2xl font-black text-slate-800">{{ totalStockConsolidado() }}</span>
+          <span class="text-xs font-bold text-slate-500 uppercase">unidades</span>
         </div>
-        <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK" class="mt-2">Volver al Catálogo</app-button>
       </div>
+      <app-button variant="secondary" (clicked)="volver()" iconNameLeft="BACK">Volver al Catálogo</app-button>
     </div>
   </div>
 

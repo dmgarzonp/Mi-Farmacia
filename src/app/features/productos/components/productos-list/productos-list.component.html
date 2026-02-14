@@ -1,4 +1,7 @@
-<div class="max-w-[1600px] mx-auto space-y-8 pb-12">
+<div 
+  class="max-w-[1600px] mx-auto space-y-8 pb-12"
+  [class.pb-40]="pedidosService.count() > 0"
+>
   <!-- Cabecera Premium -->
   <div class="flex items-center justify-between animate-fade-in">
     <div>
@@ -16,7 +19,7 @@
             <button
               (click)="gestionarLaboratorios()"
               class="flex items-center gap-2 px-4 py-2 text-xs font-black text-gray-600 hover:bg-primary-50 hover:text-primary-600 rounded-xl transition-all group"
-              title="Añadir Laboratorio"
+              appTooltip="Añadir Laboratorio"
             >
               <span class="w-4 h-4 block group-hover:scale-110 transition-transform" [innerHTML]="icons.LABORATORIES | safeHtml"></span>
               <span class="uppercase tracking-wider">+ Lab</span>
@@ -27,7 +30,7 @@
             <button
               (click)="gestionarCategorias()"
               class="flex items-center gap-2 px-4 py-2 text-xs font-black text-gray-600 hover:bg-primary-50 hover:text-primary-600 rounded-xl transition-all group"
-              title="Añadir Categoría"
+              appTooltip="Añadir Categoría"
             >
               <span class="w-4 h-4 block group-hover:scale-110 transition-transform" [innerHTML]="icons.CATEGORIES | safeHtml"></span>
               <span class="uppercase tracking-wider">+ Cat</span>
@@ -119,24 +122,28 @@
     </div>
   </div>
 
-  <!-- Contador Flotante de Faltantes -->
+  <!-- FAB Lista de Faltantes: zona segura para no tapar paginación -->
   @if (pedidosService.count() > 0) {
-    <div class="fixed bottom-8 right-8 z-[100] animate-bounce-in">
-      <button 
-        (click)="showModalConsolidacion.set(true)"
-        class="bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl shadow-emerald-500/40 border-4 border-white flex items-center gap-3 hover:scale-105 active:scale-95 transition-all group"
-      >
-        <div class="relative">
-          <span class="w-6 h-6 block" [innerHTML]="icons.CART | safeHtml"></span>
-          <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-            {{ pedidosService.count() }}
-          </span>
-        </div>
-        <div class="text-left pr-2">
-          <p class="text-[9px] font-black uppercase tracking-widest leading-none opacity-80">Lista de</p>
-          <p class="text-xs font-black uppercase tracking-tight">Faltantes</p>
-        </div>
-      </button>
+    <div 
+      class="fixed right-6 z-[100] animate-bounce-in pointer-events-none"
+      [style.bottom]="'calc(1.5rem + 4rem)'"
+      aria-hidden="true"
+    >
+      <div class="pointer-events-auto">
+        <button 
+          (click)="showModalConsolidacion.set(true)"
+          appTooltip="Ver lista y generar órdenes de compra"
+          class="bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-xl shadow-emerald-500/30 border-2 border-white flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
+        >
+          <div class="relative flex-shrink-0">
+            <span class="w-6 h-6 block" [innerHTML]="icons.CART | safeHtml"></span>
+            <span class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white">
+              {{ pedidosService.count() }}
+            </span>
+          </div>
+          <span class="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">Lista de Faltantes</span>
+        </button>
+      </div>
     </div>
   }
 
@@ -237,7 +244,7 @@
   <!-- Modal Detalle de Producto -->
   <app-modal
     [isOpen]="showModalDetalle()"
-    title="Ficha Técnica del Producto"
+    appTooltip="Ficha Técnica del Producto"
     size="lg"
     (closed)="cerrarDetalle()"
   >
@@ -355,7 +362,7 @@
       <!-- Modal de Registro Rápido de Laboratorio -->
       <app-modal
         [isOpen]="showModalLaboratorios()"
-        title="Nuevo Laboratorio"
+        appTooltip="Nuevo Laboratorio"
         size="md"
         (closed)="showModalLaboratorios.set(false)"
       >
@@ -370,7 +377,7 @@
       <!-- Modal de Registro Rápido de Categoría -->
       <app-modal
         [isOpen]="showModalCategorias()"
-        title="Nueva Categoría"
+        appTooltip="Nueva Categoría"
         size="md"
         (closed)="showModalCategorias.set(false)"
       >
@@ -386,11 +393,11 @@
       <app-modal
         [isOpen]="showModalConsolidacion()"
         title="Consolidar Pedidos de Faltantes"
-        size="lg"
+        size="xl"
         (closed)="showModalConsolidacion.set(false)"
       >
         @if (showModalConsolidacion()) {
-          <div class="p-6 space-y-6">
+          <div class="p-6 pb-8 space-y-6">
             <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-4">
               <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
                 <span class="w-6 h-6" [innerHTML]="icons.BOXES | safeHtml"></span>
@@ -440,12 +447,13 @@
               }
             </div>
 
-            <div class="pt-6 border-t border-slate-100 flex items-center justify-between">
-              <app-button variant="secondary" (clicked)="pedidosService.limpiarTodo(); showModalConsolidacion.set(false)">
-                Vaciar Lista
-              </app-button>
-              
+            <div class="pt-6 mt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4">
               <div class="flex items-center gap-3">
+                <app-button variant="secondary" (clicked)="pedidosService.limpiarTodo(); showModalConsolidacion.set(false)">
+                  Vaciar Lista
+                </app-button>
+              </div>
+              <div class="flex items-center gap-4">
                 <app-button variant="secondary" (clicked)="showModalConsolidacion.set(false)">Seguir Seleccionando</app-button>
                 <app-button 
                   variant="primary" 

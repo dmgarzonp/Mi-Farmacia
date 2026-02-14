@@ -17,6 +17,7 @@ import { CajaService } from '../../../../core/services/caja.service';
 import { ConfirmService } from '../../../../shared/services/confirm.service';
 import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { ClienteFormComponent } from '../../../clientes/components/cliente-form/cliente-form.component';
+import { TooltipDirective } from '../../../../shared/directives/tooltip.directive';
 
 interface CartItem {
     producto: Producto;
@@ -41,7 +42,8 @@ interface CartItem {
         SafeHtmlPipe, 
         CurrencyFormatPipe,
         ModalComponent,
-        ClienteFormComponent
+        ClienteFormComponent,
+        TooltipDirective
     ],
     providers: [CurrencyFormatPipe],
     templateUrl: './pos.component.html',

@@ -18,7 +18,8 @@
       <button
         (click)="toggleSidebar()"
         class="p-2 rounded-lg hover:bg-primary-700 text-primary-100 transition-all duration-300"
-        [attr.aria-label]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'"
+        [appTooltip]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'"
+          [attr.aria-label]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'"
       >
         <span class="w-5 h-5 block" [innerHTML]="(isCollapsed() ? icons.CHEVRON_DOUBLE_RIGHT : icons.CHEVRON_DOUBLE_LEFT) | safeHtml"></span>
       </button>
@@ -26,11 +27,9 @@
   </div>
 
   <!-- Navigation -->
-  <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-8 bg-primary-800">
+  <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-6 bg-primary-800">
+    <!-- Dashboard -->
     <div>
-      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
-        Menú Principal
-      </div>
       <ul class="space-y-1.5">
         <li>
           <a
@@ -38,7 +37,7 @@
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [routerLinkActiveOptions]="{exact: true}"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Dashboard' : ''"
+            [appTooltip]="isCollapsed() ? 'Dashboard' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.DASHBOARD | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Dashboard</span>
@@ -47,10 +46,10 @@
       </ul>
     </div>
 
-    <!-- Sección Operaciones -->
+    <!-- Sección VENTAS -->
     <div>
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
-        Operaciones
+        Ventas
       </div>
       <ul class="space-y-1.5">
         <li>
@@ -58,7 +57,7 @@
             routerLink="/ventas/pos"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Punto de Venta' : ''"
+            [appTooltip]="isCollapsed() ? 'Punto de Venta' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.CART | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Punto de Venta</span>
@@ -69,7 +68,7 @@
             routerLink="/ventas/caja"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Control de Caja' : ''"
+            [appTooltip]="isCollapsed() ? 'Control de Caja' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.SAVE | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Control de Caja</span>
@@ -81,7 +80,7 @@
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [routerLinkActiveOptions]="{exact: true}"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Historial Ventas' : ''"
+            [appTooltip]="isCollapsed() ? 'Historial Ventas' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.REPORTS | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Historial Ventas</span>
@@ -92,49 +91,111 @@
             routerLink="/ventas/reporte-arcsa"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Reporte ARCSA' : ''"
+            [appTooltip]="isCollapsed() ? 'Reporte ARCSA' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Reporte ARCSA</span>
           </a>
         </li>
+      </ul>
+    </div>
+
+    <!-- Sección COMPRAS -->
+    <div>
+      <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
+        Compras
+      </div>
+      <ul class="space-y-1.5">
         <li>
           <a
             routerLink="/compras"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [routerLinkActiveOptions]="{ exact: true }"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Compras' : ''"
+            [appTooltip]="isCollapsed() ? 'Órdenes de Compra' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.BOXES | safeHtml"></span>
-            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Compras</span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Órdenes de Compra</span>
+          </a>
+        </li>
+        <li>
+          <a
+            routerLink="/compras/saldos-credito"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [appTooltip]="isCollapsed() ? 'Saldos y deudas' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.REPORTS | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Saldos y deudas</span>
           </a>
         </li>
       </ul>
     </div>
 
-    <!-- Sección Inventario -->
+    <!-- Sección INVENTARIO (con submenú) -->
     <div>
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
-        Gestión de Datos
+        Inventario
       </div>
       <ul class="space-y-1.5">
+        <!-- Menú principal Inventario (expandible) -->
+        <li>
+          <button
+            (click)="toggleMenu('inventario')"
+            [class]="navItemClasses + ' w-full'"
+            [appTooltip]="isCollapsed() ? 'Inventario' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.BOXES | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold flex-1 text-left">Inventario</span>
+            <span *ngIf="!isCollapsed()" class="w-4 h-4 transition-transform duration-300" [class.rotate-180]="isMenuExpanded('inventario')">
+              <span [innerHTML]="icons.CHEVRON_DOWN | safeHtml"></span>
+            </span>
+          </button>
+          <!-- Submenú Inventario -->
+          <ul *ngIf="isMenuExpanded('inventario') && !isCollapsed()" class="ml-4 mt-1.5 space-y-1 border-l-2 border-primary-700/30 pl-4">
+            <li>
+              <a
+                routerLink="/inventario/ajustes"
+                routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+                class="flex items-center gap-3 px-4 py-2 rounded-lg text-primary-200 hover:bg-primary-700/50 hover:text-white transition-all duration-300 text-sm"
+                [appTooltip]="'Ajustes de Stock'"
+              >
+                <span class="w-4 h-4" [innerHTML]="icons.EDIT | safeHtml"></span>
+                <span class="font-medium">Ajustes de Stock</span>
+              </a>
+            </li>
+            <li>
+              <a
+                routerLink="/inventario/vencimientos"
+                routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+                class="flex items-center gap-3 px-4 py-2 rounded-lg text-primary-200 hover:bg-primary-700/50 hover:text-white transition-all duration-300 text-sm"
+                [appTooltip]="'Gestión de Vencimientos'"
+              >
+                <span class="w-4 h-4" [innerHTML]="icons.CALENDAR | safeHtml"></span>
+                <span class="font-medium">Vencimientos</span>
+              </a>
+            </li>
+          </ul>
+        </li>
+        <!-- Productos -->
         <li>
           <a
             routerLink="/productos"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Productos' : ''"
+            [appTooltip]="isCollapsed() ? 'Productos' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
-            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Productos</span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Catálogo de Productos</span>
           </a>
         </li>
+        <!-- Proveedores -->
         <li>
           <a
             routerLink="/proveedores"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Proveedores' : ''"
+            [appTooltip]="isCollapsed() ? 'Proveedores' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.TRUCK | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Proveedores</span>
@@ -143,10 +204,10 @@
       </ul>
     </div>
 
-    <!-- Sección Configuración -->
+    <!-- Sección CONFIGURACIÓN -->
     <div *ngIf="authService.esAdmin()">
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
-        Ajustes
+        Configuración
       </div>
       <ul class="space-y-1.5">
         <li>
@@ -154,7 +215,7 @@
             routerLink="/configuracion/sri"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Configuración SRI' : ''"
+            [appTooltip]="isCollapsed() ? 'Configuración SRI' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.VERIFIED | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Factura Electrónica</span>
@@ -165,7 +226,7 @@
             routerLink="/configuracion/usuarios"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
             [class]="navItemClasses"
-            [title]="isCollapsed() ? 'Gestión de Usuarios' : ''"
+            [appTooltip]="isCollapsed() ? 'Gestión de Usuarios' : ''"
           >
             <span class="w-5 h-5" [innerHTML]="icons.USERS | safeHtml"></span>
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Usuarios y Accesos</span>

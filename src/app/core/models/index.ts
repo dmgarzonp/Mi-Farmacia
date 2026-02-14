@@ -158,6 +158,12 @@ export interface Lote {
     fechaIngreso?: string;
 }
 
+/** Tipo de compra: contado (pago inmediato) o crédito (pagos posteriores) */
+export type TipoCompra = 'contado' | 'credito';
+
+/** Formas de pago alineadas al módulo de ventas */
+export type FormaPagoCompra = 'efectivo' | 'tarjeta' | 'transferencia' | 'cheque' | 'otro';
+
 /**
  * Orden de compra a proveedores
  */
@@ -168,6 +174,13 @@ export interface OrdenCompra {
     fechaEmision: string;
     fechaRequerida?: string;
     estado: EstadoOrdenCompra;
+    tipoCompra?: TipoCompra;
+    /** Plazo acordado en días (30, 90, 120) para crédito */
+    plazoDias?: number;
+    formaPago?: string;
+    fechaVencimientoPago?: string;
+    /** Fecha en que se recibió la mercancía (estado recibida) */
+    fechaRecepcion?: string;
     subtotal: number;
     descuentoMonto: number;
     impuestoTotal: number;
@@ -178,7 +191,23 @@ export interface OrdenCompra {
     creadoPor?: number;
     aprobadoPor?: number;
     observaciones?: string;
+    /** Calculado: total - suma(pagos); solo para tipo crédito */
+    saldoPendiente?: number;
     detalles?: DetalleOrdenCompra[];
+}
+
+/**
+ * Pago (abono) registrado contra una orden de compra a crédito
+ */
+export interface PagoCompra {
+    id?: number;
+    ordenCompraId: number;
+    monto: number;
+    fechaPago: string;
+    formaPago: string;
+    referencia?: string;
+    observaciones?: string;
+    registradoPor?: number;
 }
 
 /**

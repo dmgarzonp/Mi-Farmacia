@@ -47,6 +47,12 @@ export const routes: Routes = [
                 canActivate: [roleGuard([RolUsuario.ADMINISTRADOR, RolUsuario.FARMACEUTICO])]
             },
             {
+                path: 'inventario',
+                loadChildren: () => import('./features/inventario/inventario.routes').then(m => m.inventarioRoutes),
+                data: { breadcrumb: 'Inventario' },
+                canActivate: [roleGuard([RolUsuario.ADMINISTRADOR, RolUsuario.ALMACEN, RolUsuario.FARMACEUTICO])]
+            },
+            {
                 path: 'configuracion',
                 loadChildren: () => import('./features/configuracion/configuracion.routes').then(m => m.configuracionRoutes),
                 data: { breadcrumb: 'Configuración' },

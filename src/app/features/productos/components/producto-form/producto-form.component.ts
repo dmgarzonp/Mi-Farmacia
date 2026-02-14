@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, Input, Output, EventEmitter, ViewChild, ElementRef, HostListener, computed } from '@angular/core';
+import { Component, OnInit, inject, Input, Output, EventEmitter, ViewChild, ElementRef, HostListener, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormArray } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -8,10 +8,14 @@ import { LaboratoriosService } from '../../services/laboratorios.service';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
 import { InputComponent } from '../../../../shared/components/input/input.component';
 import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
+import { ModalComponent } from '../../../../shared/components/modal/modal.component';
+import { LaboratorioQuickFormComponent } from '../laboratorio-quick-form/laboratorio-quick-form.component';
+import { CategoriaQuickFormComponent } from '../categoria-quick-form/categoria-quick-form.component';
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { Producto, Presentacion, EstadoRegistro } from '../../../../core/models';
+import { TooltipDirective } from '../../../../shared/directives/tooltip.directive';
 
 /**
  * Formulario de Producto (Catálogo Maestro)
@@ -20,7 +24,7 @@ import { Producto, Presentacion, EstadoRegistro } from '../../../../core/models'
 @Component({
     selector: 'app-producto-form',
     standalone: true,
-    imports: [CommonModule, ReactiveFormsModule, ButtonComponent, InputComponent, AutocompleteComponent, SafeHtmlPipe],
+    imports: [CommonModule, ReactiveFormsModule, ButtonComponent, InputComponent, AutocompleteComponent, ModalComponent, LaboratorioQuickFormComponent, CategoriaQuickFormComponent, SafeHtmlPipe, TooltipDirective],
     templateUrl: './producto-form.component.html',
     styles: [`
         :host { display: block; }
@@ -49,6 +53,9 @@ export class ProductoFormComponent implements OnInit {
     isEditMode = false;
     productoId?: number;
     guardando = false;
+
+    showModalLaboratorio = signal(false);
+    showModalCategoria = signal(false);
 
     laboratoriosItems = computed(() => 
         this.laboratoriosService.laboratorios().map(l => ({ id: l.id, label: l.nombre }))
@@ -274,6 +281,32 @@ export class ProductoFormComponent implements OnInit {
             this.presentaciones.removeAt(index);
         } else {
             this.alertService.warning('El producto debe tener al menos una presentación');
+        }
+    }
+
+    abrirModalNuevoLaboratorio(): void {
+        this.showModalLaboratorio.set(true);
+    }
+
+    onLaboratorioGuardado(newId?: number | void): void {
+        this.showModalLaboratorio.set(false);
+        if (typeof newId === 'number') {
+            this.laboratoriosService.cargarLaboratorios().then(() => {
+                this.form.patchValue({ laboratorioId: newId });
+            });
+        }
+    }
+
+    abrirModalNuevaCategoria(): void {
+        this.showModalCategoria.set(true);
+    }
+
+    onCategoriaGuardada(newId?: number | void): void {
+        this.showModalCategoria.set(false);
+        if (typeof newId === 'number') {
+            this.categoriasService.cargarCategorias().then(() => {
+                this.form.patchValue({ categoriaId: newId });
+            });
         }
     }
 

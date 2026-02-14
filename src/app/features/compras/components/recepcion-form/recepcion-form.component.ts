@@ -80,12 +80,38 @@ import { ProductosService } from '../../../productos/services/productos.service'
                 [hasError]="!!(det.get('lote')?.invalid && det.get('lote')?.touched)"
               ></app-input>
 
-              <app-date-picker
-                label="Fecha Vencimiento"
-                formControlName="fechaVencimiento"
-                [required]="true"
-                [hasError]="!!(det.get('fechaVencimiento')?.invalid && det.get('fechaVencimiento')?.touched)"
-              ></app-date-picker>
+              <div>
+                <app-date-picker
+                  label="Fecha Vencimiento"
+                  formControlName="fechaVencimiento"
+                  [required]="true"
+                  [hasError]="!!(det.get('fechaVencimiento')?.invalid && det.get('fechaVencimiento')?.touched)"
+                ></app-date-picker>
+                <p *ngIf="det.get('fechaVencimiento')?.hasError('fechaVencimientoPasada') && det.get('fechaVencimiento')?.touched" 
+                   class="text-xs text-red-500 mt-1 ml-1">
+                  ⚠️ La fecha de vencimiento no puede ser anterior a hoy
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="orden?.tipoCompra === 'contado'" class="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4">
+          <h4 class="text-xs font-black text-emerald-900 uppercase tracking-wider">Datos de pago (compra al contado)</h4>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2">Forma de pago</label>
+              <select formControlName="formaPago" class="w-full px-4 py-2.5 bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold text-gray-800">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let fp of formasPago" [value]="fp.value">{{ fp.label }}</option>
+              </select>
+            </div>
+            <div>
+              <app-input
+                label="Referencia (voucher, transferencia...)"
+                formControlName="referenciaPago"
+                placeholder="Opcional"
+              ></app-input>
             </div>
           </div>
         </div>
@@ -114,8 +140,16 @@ import { ProductosService } from '../../../productos/services/productos.service'
 export class RecepcionFormComponent implements OnInit {
   @Input() orden?: OrdenCompra;
   @Input() loading = false;
-  @Output() saved = new EventEmitter<{detalles: DetalleOrdenCompra[], total: number}>();
+  @Output() saved = new EventEmitter<{detalles: DetalleOrdenCompra[], total: number, formaPago?: string, referenciaPago?: string}>();
   @Output() cancel = new EventEmitter<void>();
+
+  formasPago = [
+    { value: 'efectivo', label: 'Efectivo' },
+    { value: 'tarjeta', label: 'Tarjeta' },
+    { value: 'transferencia', label: 'Transferencia' },
+    { value: 'cheque', label: 'Cheque' },
+    { value: 'otro', label: 'Otro' }
+  ];
 
   private fb = inject(FormBuilder);
   private productosService = inject(ProductosService);
@@ -125,7 +159,9 @@ export class RecepcionFormComponent implements OnInit {
 
   async ngOnInit() {
     this.form = this.fb.group({
-      detalles: this.fb.array([])
+      detalles: this.fb.array([]),
+      formaPago: [''],
+      referenciaPago: ['']
     });
 
     if (this.orden?.detalles) {
@@ -148,7 +184,7 @@ export class RecepcionFormComponent implements OnInit {
           cantidad: [d.cantidad, [Validators.required, Validators.min(0.01)]],
           precioUnitario: [d.precioUnitario, [Validators.required, Validators.min(0)]],
           lote: [d.lote || '', Validators.required],
-          fechaVencimiento: [d.fechaVencimiento || fechaSugerida, Validators.required]
+          fechaVencimiento: [d.fechaVencimiento || fechaSugerida, [Validators.required, this.validarFechaVencimiento]]
         });
         
         group.valueChanges.subscribe(() => this.recalcularTotal());
@@ -170,16 +206,53 @@ export class RecepcionFormComponent implements OnInit {
     }, 0);
   }
 
+  /**
+   * Validador personalizado para fecha de vencimiento
+   * No permite fechas pasadas
+   */
+  validarFechaVencimiento(control: any): { [key: string]: any } | null {
+    if (!control.value) return null;
+    
+    const fechaVencimiento = new Date(control.value);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fechaVencimiento.setHours(0, 0, 0, 0);
+    
+    if (fechaVencimiento < hoy) {
+      return { fechaVencimientoPasada: true };
+    }
+    
+    return null;
+  }
+
   submit() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
     
-    // Devolvemos tanto los detalles actualizados como el nuevo total
+    // Validar fechas de vencimiento antes de enviar
+    let hayFechasInvalidas = false;
+    this.detalles.controls.forEach((control, index) => {
+      const fechaCtrl = control.get('fechaVencimiento');
+      if (fechaCtrl?.hasError('fechaVencimientoPasada')) {
+        hayFechasInvalidas = true;
+        fechaCtrl.markAsTouched();
+      }
+    });
+
+    if (hayFechasInvalidas) {
+      return;
+    }
+    
+    // Devolvemos tanto los detalles actualizados como el nuevo total y opcionalmente forma de pago (contado)
+    const formaPago = this.form.get('formaPago')?.value?.trim() || undefined;
+    const referenciaPago = this.form.get('referenciaPago')?.value?.trim() || undefined;
     this.saved.emit({
       detalles: this.form.value.detalles,
-      total: this.totalRecepcion
+      total: this.totalRecepcion,
+      formaPago,
+      referenciaPago
     });
   }
 }

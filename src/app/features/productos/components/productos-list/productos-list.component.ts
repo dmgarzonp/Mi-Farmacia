@@ -19,9 +19,10 @@ import { ExportService } from '../../../../shared/services/export.service';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
-import { Producto, EstadoRegistro, Presentacion, EstadoOrdenCompra } from '../../../../core/models';
+import { Producto, EstadoRegistro, Presentacion, EstadoOrdenCompra, OrdenCompra, DetalleOrdenCompra } from '../../../../core/models';
 import { ComprasService } from '../../../compras/services/compras.service';
 import { PedidosService } from '../../../../shared/services/pedidos.service';
+import { TooltipDirective } from '../../../../shared/directives/tooltip.directive';
 
 /**
  * Listado de Productos (Catálogo Maestro)
@@ -43,7 +44,8 @@ import { PedidosService } from '../../../../shared/services/pedidos.service';
         ProductoFormComponent,
         CategoriaQuickFormComponent,
         LaboratorioQuickFormComponent,
-        CurrencyFormatPipe
+        CurrencyFormatPipe,
+        TooltipDirective
     ],
     providers: [CurrencyFormatPipe],
     templateUrl: './productos-list.component.html',
@@ -493,30 +495,60 @@ export class ProductosListComponent implements OnInit {
         if (!confirmed) return;
 
         this.alertService.info('Agrupando por proveedor...');
-        
+
+        // Proveedor por defecto para items sin proveedor histórico (para que siempre se cree al menos un borrador)
+        const primerProveedorId = await this.comprasService.obtenerPrimerProveedorActivo();
+
         // Agrupar items por proveedorId
         const grupos = new Map<number | string, any[]>();
         items.forEach(item => {
-            const key = item.proveedorId || 'sin-proveedor';
+            const key = item.proveedorId ?? 'sin-proveedor';
             if (!grupos.has(key)) grupos.set(key, []);
-            grupos.get(key)?.push(item);
+            grupos.get(key)!.push(item);
         });
 
-        let creadas = 0;
-        for (const [proveedorId, productos] of grupos.entries()) {
-            if (proveedorId === 'sin-proveedor') continue;
+        const soloSinProveedor = grupos.size === 1 && grupos.has('sin-proveedor');
+        if (soloSinProveedor && !primerProveedorId) {
+            this.alertService.error('No hay proveedores activos. Cree al menos un proveedor en Compras para poder generar órdenes borrador.');
+            return;
+        }
 
-            const orden: any = {
-                proveedorId: proveedorId,
-                fechaEmision: new Date().toISOString().split('T')[0],
-                estado: EstadoOrdenCompra.BORRADOR,
-                observaciones: 'Generada automáticamente desde Lista de Faltantes',
-                detalles: productos.map(p => ({
+        let creadas = 0;
+        for (const [keyProveedor, productos] of grupos.entries()) {
+            let proveedorId: number;
+            let observaciones = 'Generada automáticamente desde Lista de Faltantes';
+
+            if (keyProveedor === 'sin-proveedor') {
+                if (!primerProveedorId) continue;
+                proveedorId = primerProveedorId;
+                observaciones = 'Generada desde Lista de Faltantes. Sin proveedor histórico; asignado el primero disponible. Revisar y cambiar si aplica.';
+            } else {
+                proveedorId = Number(keyProveedor);
+            }
+
+            const detalles: DetalleOrdenCompra[] = productos.map(p => {
+                const subtotal = p.cantidad * (p.precioSugerido || 0);
+                return {
+                    ordenCompraId: 0,
                     presentacionId: p.presentacionId,
                     cantidad: p.cantidad,
-                    precioUnitario: p.precioSugerido,
-                    subtotal: p.cantidad * p.precioSugerido
-                }))
+                    precioUnitario: p.precioSugerido || 0,
+                    subtotal
+                };
+            });
+
+            const subtotal = detalles.reduce((sum, d) => sum + d.subtotal, 0);
+            const orden: Partial<OrdenCompra> = {
+                proveedorId,
+                fechaEmision: new Date().toISOString().split('T')[0],
+                estado: EstadoOrdenCompra.BORRADOR,
+                subtotal,
+                descuentoMonto: 0,
+                impuestoTotal: 0,
+                total: subtotal,
+                moneda: 'USD',
+                observaciones,
+                detalles
             };
 
             await this.comprasService.crear(orden);

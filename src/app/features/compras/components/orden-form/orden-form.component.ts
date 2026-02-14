@@ -13,10 +13,13 @@ import { AutocompleteComponent } from '../../../../shared/components/autocomplet
 import { AlertService } from '../../../../shared/components/alert/alert.component';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { APP_ICONS } from '../../../../core/constants/icons';
-import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, Producto, Proveedor } from '../../../../core/models';
+import { OrdenCompra, DetalleOrdenCompra, EstadoOrdenCompra, TipoCompra, PagoCompra, Producto, Proveedor } from '../../../../core/models';
 import { CanComponentDeactivate } from '../../../../core/guards/save-draft-guard';
-
+import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pipe';
+
+const STORAGE_KEY_ULTIMO_BORRADOR = 'compras_ultimo_borrador';
+const BORRADOR_RECIENTE_MS = 30 * 60 * 1000; // 30 minutos
 
 /**
  * Componente formulario de orden de compra
@@ -25,7 +28,7 @@ import { CurrencyFormatPipe } from '../../../../shared/pipes/currency-format.pip
 @Component({
     selector: 'app-orden-form',
     standalone: true,
-    imports: [CommonModule, ReactiveFormsModule, ButtonComponent, InputComponent, DatePickerComponent, AutocompleteComponent, SafeHtmlPipe, CurrencyFormatPipe],
+    imports: [CommonModule, ReactiveFormsModule, ButtonComponent, InputComponent, DatePickerComponent, AutocompleteComponent, ModalComponent, SafeHtmlPipe, CurrencyFormatPipe],
     templateUrl: './orden-form.component.html',
     styles: [`:host { display: block; }`]
 })
@@ -40,6 +43,20 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
     icons = APP_ICONS;
 
     EstadoOrdenCompra = EstadoOrdenCompra;
+    TipoCompra = { CONTADO: 'contado', CREDITO: 'credito' } as const;
+    formasPago = [
+        { value: 'efectivo', label: 'Efectivo' },
+        { value: 'tarjeta', label: 'Tarjeta' },
+        { value: 'transferencia', label: 'Transferencia' },
+        { value: 'cheque', label: 'Cheque' },
+        { value: 'otro', label: 'Otro' }
+    ];
+    /** Plazos de crédito del proveedor (30, 90, 120 días) */
+    plazosCredito = [
+        { value: 30, label: '30 días' },
+        { value: 90, label: '90 días' },
+        { value: 120, label: '120 días' }
+    ];
     form!: FormGroup;
     isEditMode = false;
     ordenId?: number;
@@ -49,6 +66,14 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
     totalOrden = 0;
     private yaGuardado = false;
     private autoSaveSubject = new Subject<void>();
+
+    pagos = signal<PagoCompra[]>([]);
+    ordenCargada = signal<OrdenCompra | null>(null);
+    showModalPago = signal(false);
+    guardandoPago = false;
+    formPago!: FormGroup;
+    /** Borrador reciente guardado al salir; al abrir Nueva orden se ofrece continuar. */
+    borradorReciente = signal<{ id: number } | null>(null);
 
     /**
      * Determina si la orden está en un estado final y solo debe ser vista
@@ -87,16 +112,20 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
 
     async canDeactivate(): Promise<boolean> {
         if (this.yaGuardado) return true;
-        
-        // Si el estado es borrador y hay cambios, guardar automáticamente
-        // Solo guardamos si el formulario tiene al menos el proveedor y algún producto
-        if (this.form.get('estado')?.value === EstadoOrdenCompra.BORRADOR && 
-            this.form.dirty && 
-            this.detalles.length > 0 &&
-            this.form.get('proveedorId')?.value) {
-            
-            this.alertService.info('Guardando borrador automáticamente...');
-            await this.procesarGuardado(EstadoOrdenCompra.BORRADOR, true);
+        const tieneProveedor = this.form.get('proveedorId')?.value;
+        const tieneProductos = this.detalles.length > 0;
+        const esBorrador = this.form.get('estado')?.value === EstadoOrdenCompra.BORRADOR;
+        const hayCambios = this.form.dirty || tieneProductos;
+
+        if (esBorrador && tieneProductos && tieneProveedor) {
+            if (hayCambios) {
+                this.alertService.info('Guardando borrador antes de salir...');
+                await this.procesarGuardado(EstadoOrdenCompra.BORRADOR, true);
+            }
+            if (this.ordenId) {
+                this.guardarUltimoBorradorEnStorage(this.ordenId);
+                this.alertService.success('Borrador guardado. Al volver a Compras podrás continuar desde la lista o al abrir "Nueva orden".');
+            }
         }
         return true;
     }
@@ -153,6 +182,10 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
         this.form = this.fb.group({
             proveedorId: ['', Validators.required],
             fechaEmision: [new Date().toISOString().split('T')[0], Validators.required],
+            tipoCompra: ['contado'],
+            plazoDias: [null],
+            formaPago: [''],
+            fechaVencimientoPago: [''],
             observaciones: [''],
             estado: [EstadoOrdenCompra.BORRADOR],
             detalles: this.fb.array([])
@@ -172,12 +205,38 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
 
         // También autoguardar si cambia el proveedor o fecha
         this.form.get('proveedorId')?.valueChanges.subscribe(() => this.autoSaveSubject.next());
-        this.form.get('fechaEmision')?.valueChanges.subscribe(() => this.autoSaveSubject.next());
+        this.form.get('fechaEmision')?.valueChanges.subscribe(() => {
+            this.actualizarFechaVencimientoPorPlazo();
+            this.autoSaveSubject.next();
+        });
+        this.form.get('plazoDias')?.valueChanges.subscribe(() => {
+            this.actualizarFechaVencimientoPorPlazo();
+            this.autoSaveSubject.next();
+        });
+
+        this.formPago = this.fb.group({
+            monto: [null, [Validators.required, Validators.min(0.01)]],
+            fechaPago: [new Date().toISOString().split('T')[0], Validators.required],
+            formaPago: ['efectivo', Validators.required],
+            referencia: ['']
+        });
     }
 
     /**
      * Lógica de autoguardado frecuente al detectar cambios en productos
      */
+    /** Calcula fecha_vencimiento_pago = fecha_emision + plazo_dias cuando tipo es crédito. */
+    private actualizarFechaVencimientoPorPlazo(): void {
+        const plazo = this.form.get('plazoDias')?.value;
+        const fechaEmision = this.form.get('fechaEmision')?.value;
+        if (!plazo || !fechaEmision) return;
+        const d = new Date(fechaEmision);
+        d.setDate(d.getDate() + Number(plazo));
+        this.form.patchValue({
+            fechaVencimientoPago: d.toISOString().split('T')[0]
+        }, { emitEvent: false });
+    }
+
     private ejecutarAutoGuardado(): void {
         // Solo autoguardar si es borrador o nueva orden, y tiene los datos mínimos
         const esBorrador = this.form.get('estado')?.value === EstadoOrdenCompra.BORRADOR;
@@ -209,6 +268,8 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
             this.isEditMode = true;
             this.ordenId = parseInt(id, 10);
             await this.cargarOrden();
+        } else {
+            this.checkBorradorReciente();
         }
     }
 
@@ -219,6 +280,10 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
                 this.form.patchValue({
                     proveedorId: orden.proveedorId,
                     fechaEmision: orden.fechaEmision,
+                    tipoCompra: orden.tipoCompra || 'contado',
+                    plazoDias: orden.plazoDias ?? null,
+                    formaPago: orden.formaPago || '',
+                    fechaVencimientoPago: orden.fechaVencimientoPago || '',
                     observaciones: orden.observaciones || '',
                     estado: orden.estado
                 });
@@ -240,6 +305,13 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
                             fechaVencimiento: [d.fechaVencimiento || '']
                         }));
                     });
+                }
+                this.ordenCargada.set(orden);
+                if (orden.tipoCompra === 'credito' && this.ordenId) {
+                    const lista = await this.comprasService.obtenerPagos(this.ordenId);
+                    this.pagos.set(lista);
+                } else {
+                    this.pagos.set([]);
                 }
             } else {
                 this.alertService.error('Orden no encontrada');
@@ -351,19 +423,38 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
         }, 0);
     }
 
-    async guardar(): Promise<void> {
+    /** Generar orden: crea o confirma la orden y la deja en PENDIENTE. */
+    async generarOrden(): Promise<void> {
         if (this.form.invalid) {
             this.form.markAllAsTouched();
             return;
         }
-        
-        // Si estaba en borrador y confirmamos, pasa a pendiente
-        let nuevoEstado = this.form.value.estado;
-        if (!this.isEditMode || nuevoEstado === EstadoOrdenCompra.BORRADOR) {
-            nuevoEstado = EstadoOrdenCompra.PENDIENTE;
+        await this.procesarGuardado(EstadoOrdenCompra.PENDIENTE);
+    }
+
+    /** Actualizar orden: guarda cambios. Si es borrador mantiene BORRADOR; si es PENDIENTE/APROBADA mantiene el estado actual. */
+    async actualizarOrden(): Promise<void> {
+        if (this.form.invalid) {
+            this.form.markAllAsTouched();
+            return;
         }
-        
-        await this.procesarGuardado(nuevoEstado);
+        const estadoActual = this.form.value.estado;
+        const mantenerEstado = estadoActual === EstadoOrdenCompra.BORRADOR
+            ? EstadoOrdenCompra.BORRADOR
+            : (estadoActual || EstadoOrdenCompra.PENDIENTE);
+        await this.procesarGuardado(mantenerEstado);
+    }
+
+    /** Enter en el formulario: Generar Orden (nueva o borrador) o Actualizar Orden (resto). */
+    onSubmit(): void {
+        if (this.form.invalid || this.guardando || this.detalles.length === 0) return;
+        if (!this.isEditMode) {
+            this.generarOrden();
+        } else if (this.form.get('estado')?.value === EstadoOrdenCompra.BORRADOR) {
+            this.generarOrden();
+        } else {
+            this.actualizarOrden();
+        }
     }
 
     async guardarComoBorrador(): Promise<void> {
@@ -407,12 +498,20 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
 
             if (this.isEditMode) {
                 await this.comprasService.actualizar(this.ordenId!, orden);
-                if (!silent) this.alertService.success(`Orden ${estado === EstadoOrdenCompra.BORRADOR ? 'guardada como borrador' : 'actualizada'}`);
+                if (estado === EstadoOrdenCompra.BORRADOR) this.guardarUltimoBorradorEnStorage(this.ordenId!);
+                if (!silent) {
+                    const msg = estado === EstadoOrdenCompra.BORRADOR ? 'guardada como borrador' : (estado === EstadoOrdenCompra.PENDIENTE ? 'generada correctamente' : 'actualizada');
+                    this.alertService.success(`Orden ${msg}`);
+                }
             } else {
                 const newId = await this.comprasService.crear(orden);
                 this.ordenId = newId;
                 this.isEditMode = true;
-                if (!silent) this.alertService.success(`Orden ${estado === EstadoOrdenCompra.BORRADOR ? 'guardada como borrador' : 'creada correctamente'}`);
+                if (estado === EstadoOrdenCompra.BORRADOR) this.guardarUltimoBorradorEnStorage(newId);
+                if (!silent) {
+                    const msg = estado === EstadoOrdenCompra.BORRADOR ? 'guardada como borrador' : 'generada correctamente';
+                    this.alertService.success(`Orden ${msg}`);
+                }
             }
 
             this.form.markAsPristine(); // Marcar como limpio tras guardar
@@ -429,5 +528,73 @@ export class OrdenFormComponent implements OnInit, CanComponentDeactivate {
 
     volver(): void {
         this.router.navigate(['/compras']);
+    }
+
+    private guardarUltimoBorradorEnStorage(ordenId: number): void {
+        try {
+            sessionStorage.setItem(STORAGE_KEY_ULTIMO_BORRADOR, JSON.stringify({ id: ordenId, ts: Date.now() }));
+        } catch (_) {}
+    }
+
+    private checkBorradorReciente(): void {
+        if (this.isEditMode) return;
+        try {
+            const raw = sessionStorage.getItem(STORAGE_KEY_ULTIMO_BORRADOR);
+            if (!raw) return;
+            const data = JSON.parse(raw) as { id: number; ts: number };
+            if (Date.now() - data.ts > BORRADOR_RECIENTE_MS) return;
+            this.borradorReciente.set({ id: data.id });
+        } catch (_) {}
+    }
+
+    continuarBorradorReciente(): void {
+        const b = this.borradorReciente();
+        if (b) this.router.navigate(['/compras', b.id]);
+    }
+
+    descartarBorradorReciente(): void {
+        try {
+            sessionStorage.removeItem(STORAGE_KEY_ULTIMO_BORRADOR);
+        } catch (_) {}
+        this.borradorReciente.set(null);
+    }
+
+    openModalPago(): void {
+        const orden = this.ordenCargada();
+        const saldo = orden?.saldoPendiente ?? orden?.total ?? 0;
+        this.formPago.patchValue({
+            monto: saldo > 0 ? saldo : null,
+            fechaPago: new Date().toISOString().split('T')[0],
+            formaPago: 'efectivo',
+            referencia: ''
+        });
+        this.showModalPago.set(true);
+    }
+
+    closeModalPago(): void {
+        this.showModalPago.set(false);
+    }
+
+    async submitPago(): Promise<void> {
+        if (this.formPago.invalid || !this.ordenId) return;
+        this.guardandoPago = true;
+        try {
+            await this.comprasService.registrarPago(this.ordenId, {
+                ordenCompraId: this.ordenId,
+                monto: Number(this.formPago.get('monto')?.value),
+                fechaPago: this.formPago.get('fechaPago')?.value,
+                formaPago: this.formPago.get('formaPago')?.value || 'efectivo',
+                referencia: this.formPago.get('referencia')?.value || undefined
+            });
+            this.alertService.success('Pago registrado correctamente');
+            const orden = await this.comprasService.obtenerPorId(this.ordenId);
+            if (orden) this.ordenCargada.set(orden);
+            this.pagos.set(await this.comprasService.obtenerPagos(this.ordenId));
+            this.closeModalPago();
+        } catch (error: any) {
+            this.alertService.error('Error al registrar pago: ' + error.message);
+        } finally {
+            this.guardandoPago = false;
+        }
     }
 }

@@ -85,6 +85,20 @@ export class OrdenesListComponent implements OnInit {
             sortable: true
         },
         {
+            key: 'tipoCompra',
+            label: 'Tipo',
+            width: '100px',
+            render: (row) => row.tipoCompra === 'credito'
+                ? `<span class="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg border border-blue-200 uppercase">Crédito</span>`
+                : `<span class="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg border border-slate-200 uppercase">Contado</span>`
+        },
+        {
+            key: 'formaPago',
+            label: 'Forma pago',
+            width: '120px',
+            render: (row) => row.formaPago ? `<span class="text-[10px] font-bold text-slate-600 uppercase">${row.formaPago}</span>` : '—'
+        },
+        {
             key: 'total',
             label: 'Total',
             sortable: true,
@@ -207,13 +221,19 @@ export class OrdenesListComponent implements OnInit {
         }
     }
 
-    async confirmarRecepcion(event: {detalles: DetalleOrdenCompra[], total: number}) {
+    async confirmarRecepcion(event: {detalles: DetalleOrdenCompra[], total: number, formaPago?: string, referenciaPago?: string}) {
         const orden = this.selectedOrden();
         if (!orden) return;
 
         this.procesandoRecepcion.set(true);
         try {
-            await this.comprasService.marcarComoRecibida(orden.id!, event.detalles, event.total);
+            await this.comprasService.marcarComoRecibida(
+                orden.id!,
+                event.detalles,
+                event.total,
+                event.formaPago,
+                event.referenciaPago
+            );
             this.alertService.success('Mercancía ingresada al inventario correctamente');
             this.showModalRecepcion.set(false);
             this.selectedOrden.set(null);

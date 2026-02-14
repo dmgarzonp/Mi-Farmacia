@@ -11,8 +11,8 @@ import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { Proveedor, EstadoRegistro } from '../../../../core/models';
 
 /**
- * Formulario de Proveedor
- * Adaptado al nuevo esquema de base de datos detallado
+ * Formulario de Proveedor (datos empresa y contacto).
+ * Para ver saldos y deudas use la Ficha del proveedor (Ver Ficha en el listado).
  */
 @Component({
     selector: 'app-proveedor-form',

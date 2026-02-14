@@ -2,11 +2,12 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 
 @Component({
   selector: 'app-title-bar',
   standalone: true,
-  imports: [CommonModule, SafeHtmlPipe],
+  imports: [CommonModule, SafeHtmlPipe, TooltipDirective],
   template: `
     <div class="h-8 bg-primary-900 border-b border-primary-800 flex items-center justify-between px-3 drag-region z-50 select-none shadow-sm">
       <!-- App Name con contraste máximo -->
@@ -25,7 +26,7 @@ import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
         <button 
           (click)="minimize()"
           class="h-full px-4 text-white hover:bg-primary-800 transition-all flex items-center"
-          title="Minimizar"
+          appTooltip="Minimizar"
         >
           <span class="w-4 h-4 block" [innerHTML]="icons.MINIMIZE | safeHtml"></span>
         </button>
@@ -33,7 +34,7 @@ import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
         <button 
           (click)="maximize()"
           class="h-full px-4 text-white hover:bg-primary-800 transition-all flex items-center"
-          title="Maximizar"
+          appTooltip="Maximizar"
         >
           <span class="w-3.5 h-3.5 block" [innerHTML]="icons.MAXIMIZE | safeHtml"></span>
         </button>
@@ -41,7 +42,7 @@ import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
         <button 
           (click)="close()"
           class="h-full px-5 text-white hover:bg-primary-800 transition-all flex items-center group"
-          title="Cerrar"
+          appTooltip="Cerrar"
         >
           <span class="w-4 h-4 block transition-transform duration-300 group-hover:rotate-90" [innerHTML]="icons.CLOSE | safeHtml"></span>
         </button>

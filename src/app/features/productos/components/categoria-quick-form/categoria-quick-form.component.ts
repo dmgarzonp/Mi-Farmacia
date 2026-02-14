@@ -41,7 +41,7 @@ export class CategoriaQuickFormComponent {
   private categoriasService = inject(CategoriasService);
   private alertService = inject(AlertService);
 
-  @Output() guardado = new EventEmitter<void>();
+  @Output() guardado = new EventEmitter<number | void>();
   @Output() cancelar = new EventEmitter<void>();
 
   guardando = signal(false);
@@ -57,9 +57,9 @@ export class CategoriaQuickFormComponent {
 
     this.guardando.set(true);
     try {
-      await this.categoriasService.crear(this.form.value);
+      const newId = await this.categoriasService.crear(this.form.value);
       this.alertService.success('Categoría creada con éxito');
-      this.guardado.emit();
+      this.guardado.emit(newId);
     } catch (error: any) {
       this.alertService.error('Error al crear categoría: ' + error.message);
     } finally {

@@ -42,7 +42,7 @@
               <div class="relative">
                 <app-input label="SKU" formControlName="codigoInterno"></app-input>
                 <button type="button" (click)="generarSKU(form.get('nombreComercial')?.value || 'PRO')"
-                  class="absolute right-2 top-[30px] p-1 text-slate-300 hover:text-emerald-500" title="Auto-generar">
+                  class="absolute right-2 top-[30px] p-1 text-slate-300 hover:text-emerald-500" appTooltip="Auto-generar">
                   <span class="w-3 h-3 block" [innerHTML]="icons.BACK | safeHtml"></span>
                 </button>
               </div>
@@ -50,11 +50,33 @@
             </div>
 
             <div class="space-y-4">
-              <app-autocomplete label="Laboratorio" placeholder="Seleccionar..." formControlName="laboratorioId"
-                [items]="laboratoriosItems()"></app-autocomplete>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="flex-1 min-w-0">
+                    <app-autocomplete label="Laboratorio" placeholder="Seleccionar..." formControlName="laboratorioId"
+                      [items]="laboratoriosItems()"></app-autocomplete>
+                  </div>
+                  <button type="button" (click)="abrirModalNuevoLaboratorio()"
+                    appTooltip="Nuevo laboratorio"
+                    class="self-end mb-1 p-2 text-emerald-600 hover:text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-[0.5rem] bg-emerald-50/50 hover:bg-emerald-50 transition-all flex items-center justify-center">
+                    <span class="w-4 h-4 block" [innerHTML]="icons.ADD | safeHtml"></span>
+                  </button>
+                </div>
+              </div>
 
-              <app-autocomplete label="Categoría" placeholder="Seleccionar..." formControlName="categoriaId"
-                [items]="categoriasItems()" [required]="true"></app-autocomplete>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="flex-1 min-w-0">
+                    <app-autocomplete label="Categoría" placeholder="Seleccionar..." formControlName="categoriaId"
+                      [items]="categoriasItems()" [required]="true"></app-autocomplete>
+                  </div>
+                  <button type="button" (click)="abrirModalNuevaCategoria()"
+                    appTooltip="Nueva categoría"
+                    class="self-end mb-1 p-2 text-emerald-600 hover:text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-[0.5rem] bg-emerald-50/50 hover:bg-emerald-50 transition-all flex items-center justify-center">
+                    <span class="w-4 h-4 block" [innerHTML]="icons.ADD | safeHtml"></span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Selección de IVA (Fase 1: Inteligencia Fiscal) -->
@@ -86,7 +108,7 @@
                 <div class="relative inline-flex items-center">
                   <input type="checkbox" formControlName="requiereReceta" class="sr-only peer">
                   <div
-                    class="w-8 h-4 bg-slate-200 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4">
+                    class="w-9 h-5 bg-slate-200 border border-slate-200 rounded-full peer-checked:bg-emerald-500 peer-checked:border-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:shadow-sm after:transition-all peer-checked:after:translate-x-5">
                   </div>
                 </div>
               </div>
@@ -97,7 +119,7 @@
                 <div class="relative inline-flex items-center">
                   <input type="checkbox" formControlName="esControlado" class="sr-only peer">
                   <div
-                    class="w-8 h-4 bg-slate-200 rounded-full peer peer-checked:bg-red-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4">
+                    class="w-9 h-5 bg-slate-200 border border-slate-200 rounded-full peer-checked:bg-red-500 peer-checked:border-red-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:shadow-sm after:transition-all peer-checked:after:translate-x-5">
                   </div>
                 </div>
               </div>
@@ -248,13 +270,13 @@
                       <!-- Alertas de Error Críticas -->
                       <div class="flex flex-col gap-1 w-full">
                         @if (pres.hasError('precioVentaBajo')) {
-                          <div class="flex items-center justify-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md animate-pulse" title="¡VENTA POR DEBAJO DEL COSTO!">
+                          <div class="flex items-center justify-center gap-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md animate-pulse" appTooltip="¡VENTA POR DEBAJO DEL COSTO!">
                             <span class="w-2.5 h-2.5 block" [innerHTML]="icons.ERROR | safeHtml"></span>
                             <span class="text-[7px] font-black uppercase">BAJO COSTO</span>
                           </div>
                         }
                         @if (pres.hasError('unidadMasCaraQueCaja')) {
-                          <div class="flex items-center justify-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200" title="La unidad sale más cara que la caja">
+                          <div class="flex items-center justify-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200" appTooltip="La unidad sale más cara que la caja">
                             <span class="w-2.5 h-2.5 block" [innerHTML]="icons.ALERT | safeHtml"></span>
                             <span class="text-[7px] font-black uppercase">INCONSISTENTE</span>
                           </div>
@@ -285,13 +307,13 @@
                     <div class="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
                       <button type="button" (click)="copiarPresentacion(i)"
                         class="p-1.5 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-[0.5rem] shadow-sm"
-                        title="Duplicar">
+                        appTooltip="Duplicar">
                         <span class="w-3.5 h-3.5 block" [innerHTML]="icons.EDIT | safeHtml"></span>
                       </button>
                       @if (i > 0) {
                       <button type="button" (click)="removerPresentacion(i)"
                         class="p-1.5 text-slate-400 hover:text-red-500 bg-white border border-slate-100 rounded-[0.5rem] shadow-sm"
-                        title="Eliminar">
+                        appTooltip="Eliminar">
                         <span class="w-3.5 h-3.5 block" [innerHTML]="icons.DELETE | safeHtml"></span>
                       </button>
                       }
@@ -331,6 +353,36 @@
 
     </div>
   </form>
+
+  <!-- Modal Nuevo Laboratorio (desde ingreso de producto) -->
+  <app-modal
+    [isOpen]="showModalLaboratorio()"
+    title="Nuevo Laboratorio"
+    size="md"
+    (closed)="showModalLaboratorio.set(false)"
+  >
+    @if (showModalLaboratorio()) {
+      <app-laboratorio-quick-form
+        (guardado)="onLaboratorioGuardado($event)"
+        (cancelar)="showModalLaboratorio.set(false)"
+      ></app-laboratorio-quick-form>
+    }
+  </app-modal>
+
+  <!-- Modal Nueva Categoría (desde ingreso de producto) -->
+  <app-modal
+    [isOpen]="showModalCategoria()"
+    title="Nueva Categoría"
+    size="md"
+    (closed)="showModalCategoria.set(false)"
+  >
+    @if (showModalCategoria()) {
+      <app-categoria-quick-form
+        (guardado)="onCategoriaGuardada($event)"
+        (cancelar)="showModalCategoria.set(false)"
+      ></app-categoria-quick-form>
+    }
+  </app-modal>
 </div>
 
 <style>

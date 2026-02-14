@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { ProveedoresListComponent } from './components/proveedores-list/proveedores-list.component';
 import { ProveedorFormComponent } from './components/proveedor-form/proveedor-form.component';
+import { ProveedorFichaComponent } from './components/proveedor-ficha/proveedor-ficha.component';
 
 export const proveedoresRoutes: Routes = [
     {
@@ -12,6 +13,11 @@ export const proveedoresRoutes: Routes = [
         path: 'nuevo',
         component: ProveedorFormComponent,
         data: { breadcrumb: 'Nuevo Proveedor' }
+    },
+    {
+        path: ':id',
+        component: ProveedorFichaComponent,
+        data: { breadcrumb: 'Ficha Proveedor' }
     },
     {
         path: ':id/editar',

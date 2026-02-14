@@ -16,6 +16,7 @@ import { ExportService } from '../../../../shared/services/export.service';
 import { APP_ICONS } from '../../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 import { Proveedor, EstadoRegistro } from '../../../../core/models';
+import { TooltipDirective } from '../../../../shared/directives/tooltip.directive';
 
 /**
  * Listado de Proveedores
@@ -33,7 +34,8 @@ import { Proveedor, EstadoRegistro } from '../../../../core/models';
         SkeletonComponent, 
         TableToolsComponent, 
         ModalComponent,
-        ProveedorFormComponent
+        ProveedorFormComponent,
+        TooltipDirective
     ],
     templateUrl: './proveedores-list.component.html'
 })
@@ -165,19 +167,11 @@ export class ProveedoresListComponent implements OnInit {
 
     // ... (rest of computed and methods) ...
 
-    selectedProveedor = signal<Proveedor | null>(null);
-    showModalDetalle = signal(false);
     showModalEdicion = signal(false);
     idProveedorEdicion = signal<number | null>(null);
 
     verDetalle(proveedor: Proveedor): void {
-        this.selectedProveedor.set(proveedor);
-        this.showModalDetalle.set(true);
-    }
-
-    cerrarDetalle(): void {
-        this.showModalDetalle.set(false);
-        setTimeout(() => this.selectedProveedor.set(null), 300);
+        this.router.navigate(['/proveedores', proveedor.id]);
     }
 
     filteredProveedores = computed(() => {

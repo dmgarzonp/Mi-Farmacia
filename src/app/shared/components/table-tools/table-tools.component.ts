@@ -2,11 +2,12 @@ import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { APP_ICONS } from '../../../core/constants/icons';
 import { SafeHtmlPipe } from '../../pipes/safe-html.pipe';
+import { TooltipDirective } from '../../directives/tooltip.directive';
 
 @Component({
   selector: 'app-table-tools',
   standalone: true,
-  imports: [CommonModule, SafeHtmlPipe],
+  imports: [CommonModule, SafeHtmlPipe, TooltipDirective],
   template: `
     <div class="flex items-center gap-2">
       <!-- Grupo: Importar -->
@@ -14,7 +15,7 @@ import { SafeHtmlPipe } from '../../pipes/safe-html.pipe';
         <button 
           (click)="fileInput.click()"
           class="flex items-center gap-2 px-4 py-2 text-xs font-black text-gray-600 hover:bg-primary-50 hover:text-primary-600 rounded-xl transition-all group"
-          title="Importar desde Excel"
+          appTooltip="Importar desde Excel"
         >
           <span class="w-4 h-4 block group-hover:scale-110 transition-transform" [innerHTML]="icons.UPLOAD | safeHtml"></span>
           <span class="hidden md:block uppercase tracking-wider">Importar</span>
@@ -35,7 +36,7 @@ import { SafeHtmlPipe } from '../../pipes/safe-html.pipe';
         <button 
           (click)="downloadTemplate.emit()"
           class="flex items-center gap-2 px-4 py-2 text-[10px] font-black text-gray-400 hover:text-primary-500 rounded-xl transition-all"
-          title="Descargar Plantilla Excel"
+          appTooltip="Descargar Plantilla Excel"
         >
           <span class="w-4 h-4 block" [innerHTML]="icons.CLIPBOARD | safeHtml"></span>
           <span class="hidden lg:block uppercase tracking-tighter">Plantilla</span>
