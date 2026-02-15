@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const initialData = require('./database/initial-data');
@@ -7,6 +8,32 @@ const sriLogic = require('./sri-logic');
 
 let mainWindow;
 let db;
+
+/** Ruta de la carpeta de logs (ej. en Windows: %APPDATA%\\mi-farmacia\\logs) */
+function getLogDir() {
+    return path.join(app.getPath('userData'), 'logs');
+}
+
+function getLogPath() {
+    return path.join(getLogDir(), 'app.log');
+}
+
+function appendLog(line) {
+    try {
+        const dir = getLogDir();
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const ts = new Date().toISOString();
+        fs.appendFileSync(getLogPath(), `[${ts}] ${line}\n`);
+    } catch (e) {
+        console.error('No se pudo escribir en el log:', e);
+    }
+}
+
+// Desactivar sandbox SUID para que el AppImage funcione sin permisos root (evita error chrome-sandbox en Linux)
+app.commandLine.appendSwitch('no-sandbox');
+// Evitar errores libva/vaapi en VMs o sin GPU: desactivar aceleración por hardware
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 /**
  * Inicializa la base de datos SQLite
@@ -268,7 +295,7 @@ function createTables() {
         const tableInfo = db.prepare("PRAGMA table_info(presentaciones)").all();
         const hasPrecioCompra = tableInfo.some(col => col.name === 'precio_compra_caja');
         const isOldLotes = db.prepare("PRAGMA table_info(lotes)").all().some(col => col.name === 'producto_id');
-        
+
         if (isOldLotes || !hasPrecioCompra) {
             console.log('Old schema detected. Resetting tables for new Product-Presentation-Lote architecture...');
             db.exec('PRAGMA foreign_keys = OFF;');
@@ -283,6 +310,10 @@ function createTables() {
     } catch (e) {
         console.error('Error checking schema:', e);
     }
+
+    // Crear todas las tablas primero (necesario en primera ejecución o tras reset)
+    db.exec(schema);
+    console.log('Database tables created/checked successfully');
 
     // Asegurar columnas de facturación electrónica en ventas (Fase 2)
     try {
@@ -403,11 +434,12 @@ function createTables() {
         console.error('Error ensuring pagos_compra table:', e);
     }
 
-    db.exec(schema);
-    console.log('Database tables created/checked successfully');
-
-    // Insertar datos iniciales
-    seedInitialData();
+    // Insertar datos iniciales (no debe bloquear la apertura de la ventana)
+    try {
+        seedInitialData();
+    } catch (e) {
+        console.error('Error en seed inicial (la app seguirá abriendo):', e);
+    }
 }
 
 /**
@@ -437,18 +469,27 @@ function seedInitialData() {
         });
         seedLabs(initialData.LABORATORIOS);
 
-        // 3. Inserción de Proveedores
+        // 3. Inserción de Proveedores (soporta keys de initial-data: "Nombre Empresa", "RUC", etc.)
         const insertProv = db.prepare(`
             INSERT INTO proveedores (
-                nombre_empresa, ruc, direccion, telefono_empresa, email_empresa, 
+                nombre_empresa, ruc, direccion, telefono_empresa, email_empresa,
                 nombre_contacto, cargo_contacto, telefono_contacto, email_contacto
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const seedProvs = db.transaction((provs) => {
             for (const p of provs) {
+                const nombreEmpresa = p.nombreEmpresa ?? p['Nombre Empresa'] ?? '';
+                const ruc = p.ruc ?? p['RUC'] ?? null;
+                const direccion = p.direccion ?? p['Dirección'] ?? null;
+                const telefonoEmpresa = p.telefonoEmpresa ?? p['Teléfono Empresa'] ?? null;
+                const emailEmpresa = p.emailEmpresa ?? p['Email Empresa'] ?? null;
+                const nombreContacto = p.nombreContacto ?? p['Contacto'] ?? null;
+                const cargoContacto = p.cargoContacto ?? p['Cargo Contacto'] ?? null;
+                const telefonoContacto = p.telefonoContacto ?? p['Teléfono Contacto'] ?? null;
+                const emailContacto = p.emailContacto ?? p['Email Contacto'] ?? null;
                 insertProv.run(
-                    p.nombreEmpresa, p.ruc, p.direccion, p.telefonoEmpresa, p.emailEmpresa,
-                    p.nombreContacto, p.cargoContacto, p.telefonoContacto, p.emailContacto
+                    nombreEmpresa, ruc, direccion, telefonoEmpresa, emailEmpresa,
+                    nombreContacto, cargoContacto, telefonoContacto, emailContacto
                 );
             }
         });
@@ -551,8 +592,22 @@ function createWindow() {
         mainWindow.loadURL('http://localhost:4200');
         mainWindow.webContents.openDevTools();
     } else {
-        mainWindow.loadFile(path.join(__dirname, 'dist/mi-farmacia/browser/index.html'));
+        const indexPath = path.join(__dirname, 'dist/Mi-Farmacia/browser/index.html');
+        mainWindow.loadFile(indexPath).catch((err) => {
+            console.error('Error cargando index.html:', err);
+            mainWindow.show();
+        });
     }
+
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+    });
+    // Si tras 3 s no se dispara ready-to-show (p. ej. carga fallida), mostrar igual
+    setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+            mainWindow.show();
+        }
+    }, 3000);
 
     mainWindow.webContents.on('before-input-event', (event, input) => {
         // Ctrl+Shift+I o F12 para abrir consola
@@ -567,13 +622,21 @@ function createWindow() {
         }
     });
 
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-    });
-
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
+}
+
+/**
+ * Comprueba que la base de datos esté inicializada antes de usarla
+ */
+function ensureDb() {
+    if (!db) {
+        const msg = 'Base de datos no disponible. Reinicie la aplicación.';
+        appendLog(msg);
+        throw new Error(msg);
+    }
+    return db;
 }
 
 /**
@@ -583,7 +646,8 @@ function setupIpcHandlers() {
     // Ejecutar query SQL genérico
     ipcMain.handle('db:query', async (event, sql, params = []) => {
         try {
-            const stmt = db.prepare(sql);
+            const database = ensureDb();
+            const stmt = database.prepare(sql);
             const result = stmt.all(...params);
             return { success: true, data: result };
         } catch (error) {
@@ -595,7 +659,8 @@ function setupIpcHandlers() {
     // Ejecutar comando SQL (INSERT, UPDATE, DELETE)
     ipcMain.handle('db:run', async (event, sql, params = []) => {
         try {
-            const stmt = db.prepare(sql);
+            const database = ensureDb();
+            const stmt = database.prepare(sql);
             const result = stmt.run(...params);
             return { success: true, data: result };
         } catch (error) {
@@ -607,7 +672,8 @@ function setupIpcHandlers() {
     // Obtener un solo registro
     ipcMain.handle('db:get', async (event, sql, params = []) => {
         try {
-            const stmt = db.prepare(sql);
+            const database = ensureDb();
+            const stmt = database.prepare(sql);
             const result = stmt.get(...params);
             return { success: true, data: result };
         } catch (error) {
@@ -620,6 +686,9 @@ function setupIpcHandlers() {
     ipcMain.handle('app:getLocale', () => {
         return app.getLocale();
     });
+
+    // Ruta del archivo de log (para mostrar en Acerca de / soporte)
+    ipcMain.handle('app:getLogPath', () => getLogPath());
 
     // --- SRI FACTURACIÓN ELECTRÓNICA ---
     ipcMain.handle('sri:generar-xml', async (event, { venta, config, cliente }) => {
@@ -645,6 +714,7 @@ function setupIpcHandlers() {
     // --- AUTENTICACIÓN ---
     ipcMain.handle('auth:login', async (event, { username, password }) => {
         try {
+            ensureDb();
             const user = db.prepare("SELECT * FROM usuarios WHERE username = ? AND estado = 'activo'").get(username);
             if (!user) return { success: false, error: 'Usuario no encontrado' };
 
@@ -664,6 +734,54 @@ function setupIpcHandlers() {
         const salt = bcrypt.genSaltSync(10);
         return bcrypt.hashSync(password, salt);
     });
+
+    // --- RESPALDOS DE BASE DE DATOS ---
+    const dbPath = () => path.join(app.getPath('userData'), 'farmacia.db');
+
+    ipcMain.handle('backup:create', async () => {
+        try {
+            ensureDb();
+            const defaultName = `farmacia_respaldo_${new Date().toISOString().slice(0, 10)}.db`;
+            const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+                title: 'Guardar respaldo de base de datos',
+                defaultPath: defaultName,
+                filters: [{ name: 'Base de datos SQLite', extensions: ['db'] }]
+            });
+            if (canceled || !filePath) return { success: false, canceled: true };
+            db.pragma('wal_checkpoint(TRUNCATE)');
+            fs.copyFileSync(dbPath(), filePath);
+            return { success: true, path: filePath };
+        } catch (error) {
+            console.error('Backup error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('backup:restore', async () => {
+        try {
+            const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+                title: 'Seleccionar archivo de respaldo (.db)',
+                properties: ['openFile'],
+                filters: [{ name: 'Base de datos SQLite', extensions: ['db'] }]
+            });
+            if (canceled || !filePaths || filePaths.length === 0) return { success: false, canceled: true };
+            const sourcePath = filePaths[0];
+            const targetPath = dbPath();
+            if (db) {
+                db.close();
+                db = null;
+            }
+            fs.copyFileSync(sourcePath, targetPath);
+            app.relaunch();
+            app.exit(0);
+            return { success: true };
+        } catch (error) {
+            console.error('Restore error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('backup:getDbPath', () => dbPath());
 
     // Control de Ventana (Barra de título personalizada)
     ipcMain.on('window:minimize', () => {
@@ -686,7 +804,13 @@ function setupIpcHandlers() {
 // Eventos de ciclo de vida de Electron
 app.whenReady().then(() => {
     Menu.setApplicationMenu(null); // Elimina el menú nativo por completo
-    initDatabase();
+    try {
+        initDatabase();
+        appendLog('Base de datos inicializada correctamente');
+    } catch (e) {
+        console.error('Error al inicializar base de datos:', e);
+        appendLog('Error al inicializar base de datos: ' + (e && e.message ? e.message : String(e)));
+    }
     setupIpcHandlers();
     createWindow();
 

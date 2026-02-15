@@ -5,6 +5,8 @@ import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import { AuthService } from '../../core/services/auth.service';
+import { AboutService } from '../../core/services/about.service';
+import { RolUsuario } from '../../core/models';
 
 interface NavItem {
     label: string;
@@ -26,7 +28,9 @@ interface NavItem {
 })
 export class SidebarComponent {
     authService = inject(AuthService);
+    aboutService = inject(AboutService);
     isCollapsed = signal(false);
+    RolUsuario = RolUsuario;
     icons = APP_ICONS;
     
     // Control de submenús expandidos

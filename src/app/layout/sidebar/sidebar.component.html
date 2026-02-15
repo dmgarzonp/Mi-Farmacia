@@ -100,8 +100,8 @@
       </ul>
     </div>
 
-    <!-- Sección COMPRAS -->
-    <div>
+    <!-- Sección COMPRAS (solo Admin y Farmacéutico) -->
+    <div *ngIf="authService.tieneRol([RolUsuario.ADMINISTRADOR, RolUsuario.FARMACEUTICO])">
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
         Compras
       </div>
@@ -132,14 +132,14 @@
       </ul>
     </div>
 
-    <!-- Sección INVENTARIO (con submenú) -->
+    <!-- Sección INVENTARIO (con submenú para Admin, Almacén, Farmacéutico; Productos para todos; Proveedores para Admin y Farmacéutico) -->
     <div>
       <div [class]="isCollapsed() ? 'hidden' : 'px-4 mb-3 text-[10px] font-extrabold text-primary-300 uppercase tracking-[0.2em] opacity-50'">
         Inventario
       </div>
       <ul class="space-y-1.5">
-        <!-- Menú principal Inventario (expandible) -->
-        <li>
+        <!-- Menú principal Inventario (expandible) - solo roles con acceso a inventario -->
+        <li *ngIf="authService.tieneRol([RolUsuario.ADMINISTRADOR, RolUsuario.ALMACEN, RolUsuario.FARMACEUTICO])">
           <button
             (click)="toggleMenu('inventario')"
             [class]="navItemClasses + ' w-full'"
@@ -177,7 +177,7 @@
             </li>
           </ul>
         </li>
-        <!-- Productos -->
+        <!-- Productos (todos los roles) -->
         <li>
           <a
             routerLink="/productos"
@@ -189,8 +189,8 @@
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Catálogo de Productos</span>
           </a>
         </li>
-        <!-- Proveedores -->
-        <li>
+        <!-- Proveedores (solo Admin y Farmacéutico) -->
+        <li *ngIf="authService.tieneRol([RolUsuario.ADMINISTRADOR, RolUsuario.FARMACEUTICO])">
           <a
             routerLink="/proveedores"
             routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
@@ -232,12 +232,31 @@
             <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Usuarios y Accesos</span>
           </a>
         </li>
+        <li>
+          <a
+            routerLink="/configuracion/respaldo"
+            routerLinkActive="bg-primary-500 text-white shadow-lg shadow-primary-900/20"
+            [class]="navItemClasses"
+            [appTooltip]="isCollapsed() ? 'Respaldo de BD' : ''"
+          >
+            <span class="w-5 h-5" [innerHTML]="icons.SAVE | safeHtml"></span>
+            <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Respaldo de BD</span>
+          </a>
+        </li>
       </ul>
     </div>
   </nav>
 
-  <!-- Footer con Usuario Moderno -->
-  <div class="p-6 bg-primary-900/50 border-t border-primary-700/30">
+  <!-- Footer con Usuario y Acerca de -->
+  <div class="p-4 bg-primary-900/50 border-t border-primary-700/30 space-y-3">
+    <button
+      (click)="aboutService.open()"
+      [class]="navItemClasses + ' w-full'"
+      [appTooltip]="isCollapsed() ? 'Acerca de' : ''"
+    >
+      <span class="w-5 h-5" [innerHTML]="icons.INFO | safeHtml"></span>
+      <span [class]="isCollapsed() ? 'hidden' : 'block'" class="font-semibold">Acerca de</span>
+    </button>
     <div [class]="isCollapsed() ? 'flex justify-center' : 'flex items-center gap-3'">
       <div class="w-10 h-10 bg-primary-400 text-primary-900 rounded-full flex items-center justify-center font-bold border-2 border-primary-300 shadow-inner uppercase">
         {{ authService.usuarioActual()?.nombre?.substring(0, 1) }}

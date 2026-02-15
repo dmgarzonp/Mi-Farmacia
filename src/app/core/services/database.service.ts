@@ -1,22 +1,6 @@
 import { Injectable } from '@angular/core';
 
 /**
- * Interfaz para el API de Electron expuesto vía preload
- */
-declare global {
-    interface Window {
-        electronAPI: {
-            dbQuery: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
-            dbRun: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
-            dbGet: (sql: string, params?: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
-            getLocale: () => Promise<string>;
-            login: (credentials: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-            hashPassword: (password: string) => Promise<string>;
-        };
-    }
-}
-
-/**
  * Servicio de base de datos SQLite
  * Proporciona acceso a la base de datos a través del IPC de Electron
  */

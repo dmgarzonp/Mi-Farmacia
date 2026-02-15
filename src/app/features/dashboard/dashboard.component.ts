@@ -4,9 +4,12 @@ import { RouterModule } from '@angular/router';
 import { APP_ICONS } from '../../core/constants/icons';
 import { SafeHtmlPipe } from '../../shared/pipes/safe-html.pipe';
 import { ProductosService } from '../productos/services/productos.service';
+import { VentasService } from '../ventas/services/ventas.service';
 import { ComprasService } from '../compras/services/compras.service';
-
+import { AuthService } from '../../core/services/auth.service';
+import { NotificationsService } from '../../core/services/notifications.service';
 import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
+import { RolUsuario } from '../../core/models';
 
 /**
  * Componente Dashboard - Página principal
@@ -22,98 +25,72 @@ import { CurrencyFormatPipe } from '../../shared/pipes/currency-format.pipe';
 export class DashboardComponent implements OnInit {
     icons = APP_ICONS;
     Math = Math;
-    
+
     productosService = inject(ProductosService);
+    ventasService = inject(VentasService);
     comprasService = inject(ComprasService);
+    authService = inject(AuthService);
+    notificationsService = inject(NotificationsService);
+
+    RolUsuario = RolUsuario;
 
     stats = signal({
         totalVentasHoy: 0,
         totalProductos: 0,
         stockBajo: 0,
         sinStock: 0,
-        vencimientosProximos: 0
+        vencimientosProximos: 0,
+        totalDeudaProveedores: 0
     });
 
-    trendData = signal([
-        { day: 'Lun', value: 450 },
-        { day: 'Mar', value: 580 },
-        { day: 'Mie', value: 420 },
-        { day: 'Jue', value: 750 },
-        { day: 'Vie', value: 890 },
-        { day: 'Sab', value: 920 },
-        { day: 'Dom', value: 650 }
-    ]);
-
-    criticalAlerts = signal<any[]>([]);
+    trendData = signal<{ day: string; value: number }[]>([]);
 
     get maxTrendValue(): number {
-        return Math.max(...this.trendData().map(d => d.value)) * 1.2;
+        const data = this.trendData();
+        if (!data.length) return 100;
+        const max = Math.max(...data.map(d => d.value));
+        return max > 0 ? max * 1.2 : 100;
     }
 
     async ngOnInit() {
         await this.loadStats();
-        await this.loadAlerts();
+        await this.notificationsService.loadAlerts();
     }
 
     private async loadStats() {
-        const prodStats = await this.productosService.obtenerEstadisticas();
-        
-        this.stats.update(s => ({
-            ...s,
-            totalProductos: prodStats.total,
-            stockBajo: prodStats.stockBajo,
-            sinStock: prodStats.sinStock,
-            vencimientosProximos: prodStats.vencimientosProximos,
-            totalVentasHoy: 0 // Se implementará con el módulo de ventas
-        }));
-    }
-
-    private async loadAlerts() {
-        const alerts: any[] = [];
-        
-        // 1. Alertas de Vencimiento Reales
         try {
-            const lotesVencen = await this.productosService.db.query<any>(`
-                SELECT l.*, p.nombre_comercial, pres.nombre_descriptivo 
-                FROM lotes l 
-                JOIN presentaciones pres ON l.presentacion_id = pres.id
-                JOIN productos p ON pres.producto_id = p.id 
-                WHERE l.fecha_vencimiento <= date('now', '+30 days')
-                AND l.stock_actual > 0
-                LIMIT 3
-            `);
-            
-            this.productosService.db.toCamelCase(lotesVencen).forEach((l: any) => {
-                alerts.push({
-                    type: 'danger',
-                    message: `Lote ${l.lote} de ${l.nombreComercial} (${l.nombreDescriptivo}) vence el ${l.fechaVencimiento}`,
-                    date: 'CRÍTICO'
-                });
-            });
-        } catch (e) { console.error(e); }
+            const puedeVerCompras = this.authService.tieneRol([RolUsuario.ADMINISTRADOR, RolUsuario.FARMACEUTICO]);
+            const [prodStats, totalVentasHoy, ventas7Dias, totalDeuda] = await Promise.all([
+                this.productosService.obtenerEstadisticas().catch(() => ({ total: 0, stockBajo: 0, sinStock: 0, vencimientosProximos: 0 })),
+                this.ventasService.obtenerTotalVentasHoy().catch(() => 0),
+                this.ventasService.obtenerVentasUltimos7Dias().catch(() => []),
+                puedeVerCompras ? this.comprasService.obtenerTotalDeudaProveedores().catch(() => 0) : Promise.resolve(0)
+            ]);
 
-        // 2. Alertas de Stock Crítico
-        if (this.stats().stockBajo > 0) {
-            alerts.push({
-                type: 'warning',
-                message: `Tienes ${this.stats().stockBajo} productos con stock bajo o nulo`,
-                date: 'Inventario'
-            });
+            this.stats.update(s => ({
+                ...s,
+                totalProductos: prodStats?.total ?? 0,
+                stockBajo: prodStats?.stockBajo ?? 0,
+                sinStock: prodStats?.sinStock ?? 0,
+                vencimientosProximos: prodStats?.vencimientosProximos ?? 0,
+                totalVentasHoy: totalVentasHoy ?? 0,
+                totalDeudaProveedores: totalDeuda ?? 0
+            }));
+            this.trendData.set(Array.isArray(ventas7Dias) ? ventas7Dias : []);
+        } catch (e) {
+            console.error('Error cargando estadísticas del dashboard:', e);
         }
-
-        this.criticalAlerts.set(alerts.length > 0 ? alerts : [
-            { type: 'info', message: 'No hay alertas críticas pendientes', date: 'Al día' }
-        ]);
     }
 
     // Generador de puntos para el gráfico SVG
     get chartPoints(): string {
-        const data = this.trendData();
+        const data = this.trendData() ?? [];
+        if (!data.length) return '';
         const max = this.maxTrendValue;
         const width = 400;
         const height = 150;
-        const stepX = width / (data.length - 1);
-        
+        const stepX = data.length > 1 ? width / (data.length - 1) : 0;
+
         return data.map((d, i) => {
             const x = i * stepX;
             const y = height - (d.value / max) * height;

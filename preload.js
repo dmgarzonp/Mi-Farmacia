@@ -14,7 +14,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     windowClose: () => ipcRenderer.send('window:close'),
     // System info
     getLocale: () => ipcRenderer.invoke('app:getLocale'),
+    getLogPath: () => ipcRenderer.invoke('app:getLogPath'),
     // Auth operations
     login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
     hashPassword: (password) => ipcRenderer.invoke('auth:hash-password', password),
+    // Respaldos de base de datos
+    backupCreate: () => ipcRenderer.invoke('backup:create'),
+    backupRestore: () => ipcRenderer.invoke('backup:restore'),
+    backupGetDbPath: () => ipcRenderer.invoke('backup:getDbPath'),
 });

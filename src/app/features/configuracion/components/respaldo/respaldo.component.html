@@ -1,0 +1,61 @@
+<div class="max-w-4xl mx-auto space-y-8 animate-fade-in pb-12">
+  <div class="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+    <div class="flex items-center gap-5">
+      <div class="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-200">
+        <span class="w-7 h-7" [innerHTML]="icons.SAVE | safeHtml"></span>
+      </div>
+      <div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Respaldo y restauración</h1>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Base de datos SQLite</p>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isAvailable" class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-amber-800">
+    <p class="font-bold">Los respaldos solo están disponibles en la aplicación de escritorio (Electron).</p>
+    <p class="text-sm mt-2">Si está usando el navegador, abra la aplicación instalada para crear o restaurar respaldos.</p>
+  </div>
+
+  <div *ngIf="isAvailable" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h2 class="text-sm font-black text-slate-700 mb-2 flex items-center gap-2">
+        <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+        Crear respaldo
+      </h2>
+      <p class="text-sm text-slate-500 mb-4">Guarda una copia de la base de datos en la ubicación que elija. Se recomienda hacerlo con frecuencia.</p>
+      <app-button
+        variant="primary"
+        iconNameLeft="SAVE"
+        [disabled]="loadingBackup()"
+        (clicked)="crearRespaldo()"
+      >
+        {{ loadingBackup() ? 'Creando...' : 'Crear respaldo' }}
+      </app-button>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h2 class="text-sm font-black text-slate-700 mb-2 flex items-center gap-2">
+        <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+        Restaurar desde respaldo
+      </h2>
+      <p class="text-sm text-slate-500 mb-4">Reemplaza la base de datos actual por un archivo .db de respaldo. La aplicación se reiniciará.</p>
+      <app-button
+        variant="secondary"
+        iconNameLeft="BACK"
+        [disabled]="loadingRestore()"
+        (clicked)="restaurar()"
+      >
+        {{ loadingRestore() ? 'Restaurando...' : 'Restaurar' }}
+      </app-button>
+    </div>
+  </div>
+
+  <div *ngIf="isAvailable" class="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm text-slate-600">
+    <p class="font-bold text-slate-700 mb-2">Recomendaciones</p>
+    <ul class="list-disc list-inside space-y-1">
+      <li>Realice respaldos periódicos (por ejemplo, al cierre del día o de la semana).</li>
+      <li>Guarde los archivos .db en una unidad externa o en la nube.</li>
+      <li>Antes de restaurar, cierre cualquier otra ventana de la aplicación.</li>
+    </ul>
+  </div>
+</div>

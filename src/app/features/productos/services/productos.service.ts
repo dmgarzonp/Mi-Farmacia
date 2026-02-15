@@ -378,7 +378,8 @@ export class ProductosService {
     }> {
         try {
             const sqlTotal = `SELECT COUNT(*) as total FROM productos WHERE estado = 'activo'`;
-            const total = (await this.db.get<any>(sqlTotal)).total;
+            const rowTotal = await this.db.get<any>(sqlTotal);
+            const total = rowTotal?.total ?? 0;
 
             const sqlStockBajo = `
                 SELECT COUNT(*) as count FROM (
@@ -390,7 +391,8 @@ export class ProductosService {
                     AND SUM(COALESCE(l.stock_actual, 0)) > 0
                 )
             `;
-            const stockBajo = (await this.db.get<any>(sqlStockBajo)).count;
+            const rowStockBajo = await this.db.get<any>(sqlStockBajo);
+            const stockBajo = rowStockBajo?.count ?? 0;
 
             const sqlSinStock = `
                 SELECT COUNT(*) as count FROM (
@@ -401,7 +403,8 @@ export class ProductosService {
                     HAVING SUM(COALESCE(l.stock_actual, 0)) = 0
                 )
             `;
-            const sinStock = (await this.db.get<any>(sqlSinStock)).count;
+            const rowSinStock = await this.db.get<any>(sqlSinStock);
+            const sinStock = rowSinStock?.count ?? 0;
 
             const sqlVencimientos = `
                 SELECT COUNT(*) as count 
@@ -409,13 +412,14 @@ export class ProductosService {
                 WHERE fecha_vencimiento <= date('now', '+30 days')
                 AND stock_actual > 0
             `;
-            const vencimientos = (await this.db.get<any>(sqlVencimientos)).count;
+            const rowVencimientos = await this.db.get<any>(sqlVencimientos);
+            const vencimientos = rowVencimientos?.count ?? 0;
 
             return {
-                total: total || 0,
-                stockBajo: stockBajo || 0,
-                sinStock: sinStock || 0,
-                vencimientosProximos: vencimientos || 0
+                total,
+                stockBajo,
+                sinStock,
+                vencimientosProximos: vencimientos
             };
         } catch (err: any) {
             console.error('Error obteniendo estadísticas:', err);

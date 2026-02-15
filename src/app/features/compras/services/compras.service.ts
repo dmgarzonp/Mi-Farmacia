@@ -234,6 +234,23 @@ export class ComprasService {
     }
 
     /**
+     * Cantidad de órdenes pendientes de aprobar o recibir (estado pendiente o aprobada).
+     */
+    async obtenerOrdenesPendientesCount(): Promise<number> {
+        try {
+            const row = await this.db.get<{ count: number }>(
+                `SELECT COUNT(*) as count FROM ordenes_compra WHERE estado IN (?, ?)`,
+                [EstadoOrdenCompra.PENDIENTE, EstadoOrdenCompra.APROBADA]
+            );
+            const count = row != null ? Number((row as any).count ?? 0) : 0;
+            return count;
+        } catch (err: any) {
+            console.error('Error obteniendo count órdenes pendientes:', err);
+            return 0;
+        }
+    }
+
+    /**
      * Órdenes a crédito con saldo pendiente, para vista "Saldos de cancelación".
      */
     async obtenerOrdenesConSaldoPendiente(filtros?: { proveedorId?: number; plazoDias?: number }): Promise<(OrdenCompra & { diasRestantes?: number; diasVencido?: number })[]> {
@@ -432,6 +449,27 @@ export class ComprasService {
         } catch (err: any) {
             console.error('Error obteniendo kardex proveedor:', err);
             throw err;
+        }
+    }
+
+    /**
+     * Total deuda con todos los proveedores (suma de saldos pendientes de órdenes a crédito).
+     * Útil para dashboard y visibilidad de pasivo a corto plazo.
+     */
+    async obtenerTotalDeudaProveedores(): Promise<number> {
+        try {
+            const sql = `
+                SELECT COALESCE(SUM(oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)), 0) as total
+                FROM ordenes_compra oc
+                WHERE oc.tipo_compra = 'credito'
+                AND (oc.total - COALESCE((SELECT SUM(monto) FROM pagos_compra WHERE orden_compra_id = oc.id), 0)) > 0
+            `;
+            const row = await this.db.get<{ total: number }>(sql, []);
+            const n = row != null ? Number((row as any).total ?? 0) : 0;
+            return n;
+        } catch (err: any) {
+            console.error('Error obteniendo total deuda proveedores:', err);
+            return 0;
         }
     }
 

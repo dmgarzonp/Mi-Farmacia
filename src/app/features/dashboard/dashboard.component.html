@@ -12,8 +12,8 @@
     </div>
   </div>
 
-  <!-- KPI Cards Esmeralda Moderno -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
     <!-- Ventas Hoy -->
     <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer">
       <div class="flex items-center gap-4 relative z-10">
@@ -69,6 +69,24 @@
       </div>
       <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-red-50/30 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
     </div>
+
+    <!-- Deuda con proveedores (solo Admin / Farmacéutico) -->
+    <a *ngIf="authService.tieneRol([RolUsuario.ADMINISTRADOR, RolUsuario.FARMACEUTICO])"
+       routerLink="/compras/saldos-credito"
+       class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden relative cursor-pointer block"
+    >
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">
+          <span class="w-6 h-6 block" [innerHTML]="icons.BOXES | safeHtml"></span>
+        </div>
+        <div>
+          <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Deuda con proveedores</p>
+          <p class="text-2xl font-black text-slate-800">{{ stats().totalDeudaProveedores | currencyFormat }}</p>
+          <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Saldos a crédito</p>
+        </div>
+      </div>
+      <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-slate-100/50 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+    </a>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -110,8 +128,8 @@
           
           <!-- Dots -->
           <circle 
-            *ngFor="let d of trendData(); let i = index" 
-            [attr.cx]="i * (400 / (trendData().length - 1))" 
+            *ngFor="let d of (trendData() ?? []); let i = index" 
+            [attr.cx]="i * (400 / ((trendData() ?? []).length - 1 || 1))" 
             [attr.cy]="150 - (d.value / maxTrendValue) * 150" 
             r="4" 
             class="fill-white stroke-primary-600" 
@@ -121,7 +139,7 @@
         
         <!-- X-Axis Labels -->
         <div class="flex justify-between mt-6 px-1">
-          <span *ngFor="let d of trendData()" class="text-[10px] font-black text-gray-400 uppercase tracking-tighter">
+          <span *ngFor="let d of (trendData() ?? [])" class="text-[10px] font-black text-gray-400 uppercase tracking-tighter">
             {{ d.day }}
           </span>
         </div>
@@ -136,32 +154,56 @@
       </h2>
       
       <div class="space-y-4">
-        <div *ngFor="let alert of criticalAlerts()" 
-          class="flex gap-4 p-4 rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
-          [ngClass]="{
-            'bg-red-50/50 border-red-100/50': alert.type === 'danger',
-            'bg-amber-50/50 border-amber-100/50': alert.type === 'warning',
-            'bg-blue-50/50 border-blue-100/50': alert.type === 'info'
-          }"
-        >
-          <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+        <ng-container *ngFor="let alert of notificationsService.alerts()">
+          <a *ngIf="alert.link" [routerLink]="alert.link"
+            class="flex gap-4 p-4 rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-md block"
             [ngClass]="{
-              'bg-red-500 text-white': alert.type === 'danger',
-              'bg-amber-500 text-white': alert.type === 'warning',
-              'bg-blue-500 text-white': alert.type === 'info'
+              'bg-red-50/50 border-red-100/50': alert.type === 'danger',
+              'bg-amber-50/50 border-amber-100/50': alert.type === 'warning',
+              'bg-blue-50/50 border-blue-100/50': alert.type === 'info'
             }"
           >
-            <span class="w-5 h-5" [innerHTML]="(alert.type === 'danger' ? icons.ERROR : alert.type === 'warning' ? icons.ALERT : icons.INFO) | safeHtml"></span>
+            <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+              [ngClass]="{
+                'bg-red-500 text-white': alert.type === 'danger',
+                'bg-amber-500 text-white': alert.type === 'warning',
+                'bg-blue-500 text-white': alert.type === 'info'
+              }"
+            >
+              <span class="w-5 h-5" [innerHTML]="(alert.type === 'danger' ? icons.ERROR : alert.type === 'warning' ? icons.ALERT : icons.INFO) | safeHtml"></span>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-bold text-gray-900 leading-tight mb-1">{{ alert.message }}</p>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ alert.date }}</p>
+            </div>
+          </a>
+          <div *ngIf="!alert.link"
+            class="flex gap-4 p-4 rounded-2xl border transition-all duration-300"
+            [ngClass]="{
+              'bg-red-50/50 border-red-100/50': alert.type === 'danger',
+              'bg-amber-50/50 border-amber-100/50': alert.type === 'warning',
+              'bg-blue-50/50 border-blue-100/50': alert.type === 'info'
+            }"
+          >
+            <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+              [ngClass]="{
+                'bg-red-500 text-white': alert.type === 'danger',
+                'bg-amber-500 text-white': alert.type === 'warning',
+                'bg-blue-500 text-white': alert.type === 'info'
+              }"
+            >
+              <span class="w-5 h-5" [innerHTML]="(alert.type === 'danger' ? icons.ERROR : alert.type === 'warning' ? icons.ALERT : icons.INFO) | safeHtml"></span>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-bold text-gray-900 leading-tight mb-1">{{ alert.message }}</p>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ alert.date }}</p>
+            </div>
           </div>
-          <div class="flex-1">
-            <p class="text-sm font-bold text-gray-900 leading-tight mb-1">{{ alert.message }}</p>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ alert.date }}</p>
-          </div>
-        </div>
+        </ng-container>
         
-        <button class="w-full py-3 mt-4 text-sm font-black text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-2xl transition-colors border-2 border-dashed border-primary-200 uppercase tracking-widest">
+        <a routerLink="/inventario/vencimientos" class="w-full py-3 mt-4 text-sm font-black text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-2xl transition-colors border-2 border-dashed border-primary-200 uppercase tracking-widest inline-block text-center">
           Ver todas las notificaciones
-        </button>
+        </a>
       </div>
     </div>
   </div>
@@ -194,11 +236,11 @@
         <span class="text-sm font-extrabold text-gray-700 group-hover:text-white transition-colors">Productos</span>
       </a>
 
-      <a routerLink="/clientes" class="group flex flex-col items-center p-6 bg-background-light/50 hover:bg-primary-600 rounded-3xl transition-all duration-500 shadow-sm hover:shadow-primary-500/40 hover:-translate-y-2">
+      <a routerLink="/inventario/vencimientos" class="group flex flex-col items-center p-6 bg-background-light/50 hover:bg-primary-600 rounded-3xl transition-all duration-500 shadow-sm hover:shadow-primary-500/40 hover:-translate-y-2">
         <div class="w-12 h-12 bg-white text-primary-600 group-hover:bg-primary-500 group-hover:text-white group-hover:rotate-12 rounded-xl flex items-center justify-center transition-all duration-500 mb-4 shadow-md">
-          <span class="w-8 h-8 block" [innerHTML]="icons.USERS | safeHtml"></span>
+          <span class="w-6 h-6 block" [innerHTML]="icons.CALENDAR | safeHtml"></span>
         </div>
-        <span class="text-sm font-extrabold text-gray-700 group-hover:text-white transition-colors">Clientes</span>
+        <span class="text-sm font-extrabold text-gray-700 group-hover:text-white transition-colors">Vencimientos</span>
       </a>
     </div>
   </div>

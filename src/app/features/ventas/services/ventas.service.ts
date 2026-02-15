@@ -45,6 +45,49 @@ export class VentasService {
     }
 
     /**
+     * Total de ventas completadas del día actual (para dashboard).
+     */
+    async obtenerTotalVentasHoy(): Promise<number> {
+        const sql = `
+            SELECT COALESCE(SUM(total), 0) as total
+            FROM ventas
+            WHERE date(fecha_venta) = date('now', 'localtime')
+            AND estado = ?
+        `;
+        const res = await this.db.get<{ total: number }>(sql, [EstadoVenta.COMPLETADA]);
+        return res?.total ?? 0;
+    }
+
+    /**
+     * Ventas por día de los últimos 7 días (para gráfico del dashboard).
+     * Retorna array con día (abreviatura) y valor; días sin ventas tienen 0.
+     */
+    async obtenerVentasUltimos7Dias(): Promise<{ day: string; value: number }[]> {
+        const sql = `
+            SELECT date(fecha_venta) as f, SUM(total) as total
+            FROM ventas
+            WHERE estado = ?
+            AND date(fecha_venta) >= date('now', 'localtime', '-6 days')
+            GROUP BY date(fecha_venta)
+            ORDER BY f ASC
+        `;
+        const rows = await this.db.query<{ f: string; total: number }>(sql, [EstadoVenta.COMPLETADA]);
+        const map = new Map<string, number>();
+        rows.forEach(r => map.set(r.f, r.total ?? 0));
+
+        const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const result: { day: string; value: number }[] = [];
+        for (let i = -6; i <= 0; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            const dateStr = d.toISOString().split('T')[0];
+            const dayLabel = dayLabels[d.getDay()];
+            result.push({ day: dayLabel, value: map.get(dateStr) ?? 0 });
+        }
+        return result;
+    }
+
+    /**
      * Carga el historial de ventas completo con datos SRI
      */
     async cargarVentas(): Promise<void> {
