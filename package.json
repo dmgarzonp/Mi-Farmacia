@@ -32,6 +32,7 @@
       "preload.js",
       "sri-logic.js",
       "database/**/*",
+      "build/icons/**/*",
       "node_modules/**/*"
     ],
     "asarUnpack": [
@@ -42,6 +43,7 @@
         "AppImage",
         "deb"
       ],
+      "icon": "build/icons",
       "category": "Office"
     },
     "win": {

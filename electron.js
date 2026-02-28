@@ -580,7 +580,7 @@ function createWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, 'src/assets/icon.png'),
+        icon: path.join(__dirname, 'build/icons/256x256.png'),
         show: false
     });
 
